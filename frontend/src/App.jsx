@@ -7,8 +7,9 @@ import { AcademicYearProvider } from './context/AcademicYearContext';
 // Guards
 import SchoolProtectedRoute from './components/SchoolProtectedRoute';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
 
-// Pages
+// Module 1 Pages
 import HomePage from './pages/HomePage';
 import SchoolRegisterPage from './pages/SchoolRegisterPage';
 import SchoolLoginPage from './pages/SchoolLoginPage';
@@ -17,6 +18,13 @@ import FirstLoginPasswordChangePage from './pages/FirstLoginPasswordChangePage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import ChangePasswordPage from './pages/ChangePasswordPage';
+
+// Module 2 Admin Pages
+import UserManagementPage from './pages/admin/UserManagementPage';
+import AcademicYearManagementPage from './pages/admin/AcademicYearManagementPage';
+import ClassManagementPage from './pages/admin/ClassManagementPage';
+import SectionManagementPage from './pages/admin/SectionManagementPage';
+import SubjectManagementPage from './pages/admin/SubjectManagementPage';
 
 function App() {
   return (
@@ -74,6 +82,52 @@ function App() {
                   <ProtectedRoute>
                     <ChangePasswordPage />
                   </ProtectedRoute>
+                }
+              />
+
+              {/* Module 2: Administrative Setup Routes (Admin Only) */}
+              <Route
+                path="/admin/users"
+                element={
+                  <AdminRoute>
+                    <UserManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/academic-years"
+                element={
+                  <AdminRoute>
+                    <AcademicYearManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/classes"
+                element={
+                  <AdminRoute>
+                    <ClassManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/sections"
+                element={
+                  <AdminRoute>
+                    <SectionManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/subjects"
+                element={
+                  <AdminRoute>
+                    <SubjectManagementPage />
+                  </AdminRoute>
                 }
               />
 

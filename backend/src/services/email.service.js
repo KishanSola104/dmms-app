@@ -212,6 +212,103 @@ class EmailService {
       html
     });
   }
+
+  /**
+   * Send User Welcome Credentials Email (Module 2)
+   */
+  static async sendUserCredentials({ userEmail, userName, schoolName, schoolId, userId, tempPassword, roleName }) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const loginUrl = `${frontendUrl}/school-login`;
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: #1e3a8a; padding: 24px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 24px;">Digital Marksheet Management System</h1>
+          <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">Welcome to ${schoolName}</p>
+        </div>
+        <div style="padding: 24px; color: #334155; line-height: 1.6;">
+          <p>Dear <strong>${userName}</strong>,</p>
+          <p>An account has been created for you as <strong>${roleName}</strong> at <strong>${schoolName}</strong> on the DMMS platform.</p>
+          
+          <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 16px; margin: 20px 0; border-radius: 4px;">
+            <h3 style="margin-top: 0; color: #1e3a8a;">Your Login Credentials</h3>
+            <p style="margin: 6px 0;"><strong>School ID:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${schoolId}</span></p>
+            <p style="margin: 6px 0;"><strong>User ID:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: 15px; font-weight: bold;">${userId}</span></p>
+            <p style="margin: 6px 0;"><strong>Temporary Password:</strong> <span style="font-family: monospace; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-size: 15px; font-weight: bold;">${tempPassword}</span></p>
+          </div>
+
+          <h4 style="color: #1e293b; margin-bottom: 8px;">Login Instructions:</h4>
+          <ol style="padding-left: 20px; margin-top: 4px;">
+            <li>First, authenticate your school portal using the <strong>School ID</strong> and school password.</li>
+            <li>On the User Login page, select your role: <strong>${roleName}</strong>.</li>
+            <li>Enter your <strong>User ID</strong> (or email) and the temporary password above.</li>
+            <li><strong>Mandatory:</strong> You will be required to choose a new permanent password on your first login.</li>
+          </ol>
+
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${loginUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Access DMMS Portal</a>
+          </div>
+
+          <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
+            <em>Security Warning: Please do not share your temporary password. Set your new password immediately.</em>
+          </p>
+        </div>
+        <div style="background-color: #f1f5f9; padding: 16px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0;">Designed and Developed by <strong>Shreeji IT Solutions PVT. LTD.</strong></p>
+          <p style="margin: 4px 0 0;">&copy; Digital Marksheet Management System</p>
+        </div>
+      </div>
+    `;
+
+    return await this.sendMail({
+      to: userEmail,
+      subject: `[DMMS] Account Credentials - ${userName} (${userId})`,
+      html
+    });
+  }
+
+  /**
+   * Send Admin Confirmation Code (OTP) for Sensitive Actions (Module 2)
+   */
+  static async sendAdminConfirmationOtp({ adminEmail, adminName, schoolName, action, targetUserName, code }) {
+    const isDelete = action === 'DELETE_USER';
+    const actionTitle = isDelete ? 'User Account Deletion' : 'User Account Deactivation';
+    const actionColor = isDelete ? '#dc2626' : '#ea580c';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: ${actionColor}; padding: 24px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 22px;">Security Confirmation Required</h1>
+          <p style="margin: 8px 0 0; opacity: 0.9; font-size: 14px;">${actionTitle} Request</p>
+        </div>
+        <div style="padding: 24px; color: #334155; line-height: 1.6;">
+          <p>Dear Administrator <strong>${adminName}</strong>,</p>
+          <p>You have initiated an administrative action to <strong>${isDelete ? 'permanently DELETE' : 'DEACTIVATE'}</strong> the user account for <strong>${targetUserName}</strong> in <strong>${schoolName}</strong>.</p>
+          
+          <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 20px; margin: 20px 0; border-radius: 8px; text-align: center;">
+            <p style="margin: 0 0 8px; font-size: 13px; color: #991b1b; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Your One-Time Confirmation Code</p>
+            <div style="font-family: monospace; font-size: 32px; font-weight: bold; color: ${actionColor}; letter-spacing: 6px;">
+              ${code}
+            </div>
+            <p style="margin: 8px 0 0; font-size: 12px; color: #7f1d1d;">This code is valid for 10 minutes and can only be used once.</p>
+          </div>
+
+          <p style="font-size: 13px; color: #64748b;">
+            If you did not initiate this request, please change your administrator password immediately and contact support.
+          </p>
+        </div>
+        <div style="background-color: #f1f5f9; padding: 14px; text-align: center; font-size: 12px; color: #64748b;">
+          &copy; Digital Marksheet Management System | Shreeji IT Solutions PVT. LTD.
+        </div>
+      </div>
+    `;
+
+    return await this.sendMail({
+      to: adminEmail,
+      subject: `[DMMS Security Code] ${actionTitle} Confirmation (${code})`,
+      html
+    });
+  }
 }
 
 module.exports = EmailService;

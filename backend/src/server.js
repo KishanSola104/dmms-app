@@ -12,6 +12,7 @@ const schoolRoutes = require('./routes/school.routes');
 const authRoutes = require('./routes/auth.routes');
 const profileRoutes = require('./routes/profile.routes');
 const commonRoutes = require('./routes/common.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -48,6 +49,7 @@ app.use('/api/school', schoolRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/common', commonRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

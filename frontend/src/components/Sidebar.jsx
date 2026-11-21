@@ -1,13 +1,46 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, UserCheck, KeyRound, Building, LogOut, Shield } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  UserCheck,
+  KeyRound,
+  Building,
+  LogOut,
+  Shield,
+  Settings,
+  Users,
+  Calendar,
+  Layers,
+  GraduationCap,
+  BookOpen,
+  ChevronDown,
+  ChevronRight
+} from 'lucide-react';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 
 const Sidebar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser, logoutUser } = useUserAuth();
   const { currentSchool, logoutSchool } = useSchoolAuth();
+
+  // Expandable sections state
+  const isInsideAdmin = location.pathname.startsWith('/admin');
+  const isInsideClasses = location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections');
+
+  const [adminSetupOpen, setAdminSetupOpen] = useState(true);
+  const [classesSectionsOpen, setClassesSectionsOpen] = useState(true);
+
+  // Auto-expand active branches if navigating
+  useEffect(() => {
+    if (isInsideAdmin) {
+      setAdminSetupOpen(true);
+    }
+    if (isInsideClasses) {
+      setClassesSectionsOpen(true);
+    }
+  }, [location.pathname]);
 
   const handleSchoolLogout = () => {
     if (window.confirm('Are you sure you want to change school? This will clear the current school session.')) {
@@ -32,7 +65,7 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col min-h-[calc(100vh-4rem)] border-r border-slate-800">
+    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col min-h-[calc(100vh-4rem)] border-r border-slate-800 select-none">
       {/* School Card in Sidebar */}
       <div className="p-4 border-b border-slate-800 bg-slate-950/40">
         <div className="flex items-start space-x-3">
@@ -54,7 +87,7 @@ const Sidebar = () => {
       </div>
 
       {/* Navigation Links */}
-      <div className="flex-1 py-4 px-3 space-y-1">
+      <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
           Main Menu
         </div>
@@ -73,6 +106,142 @@ const Sidebar = () => {
           <LayoutDashboard className="w-4 h-4 mr-3" />
           <span>Dashboard</span>
         </NavLink>
+
+        {/* ADMIN ONLY: Administrative Setup Expandable Menu */}
+        {currentUser?.roleCode === 'ADMIN' && (
+          <div className="pt-2">
+            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Administration
+            </div>
+
+            {/* Expandable Header */}
+            <button
+              type="button"
+              onClick={() => setAdminSetupOpen(!adminSetupOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                isInsideAdmin
+                  ? 'text-white bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center">
+                <Settings className="w-4 h-4 mr-3 text-blue-400" />
+                <span>Administrative Setup</span>
+              </div>
+              {adminSetupOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {/* Expandable Sub-items */}
+            {adminSetupOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                {/* 1. User Management */}
+                <NavLink
+                  to="/admin/users"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>User Management</span>
+                </NavLink>
+
+                {/* 2. Academic Year Management */}
+                <NavLink
+                  to="/admin/academic-years"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Calendar className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Academic Year Management</span>
+                </NavLink>
+
+                {/* 3. Classes & Sections Nested Expandable Menu */}
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setClassesSectionsOpen(!classesSectionsOpen)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isInsideClasses
+                        ? 'text-white font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <Layers className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                      <span>Classes &amp; Sections</span>
+                    </div>
+                    {classesSectionsOpen ? (
+                      <ChevronDown className="w-3 h-3 text-slate-500" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-slate-500" />
+                    )}
+                  </button>
+
+                  {/* Nested Class & Section links */}
+                  {classesSectionsOpen && (
+                    <div className="ml-4 pl-2 border-l border-slate-800/80 space-y-1 mt-1">
+                      <NavLink
+                        to="/admin/classes"
+                        className={({ isActive }) =>
+                          `flex items-center px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white font-semibold'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                          }`
+                        }
+                      >
+                        <GraduationCap className="w-3 h-3 mr-2" />
+                        <span>Class Management</span>
+                      </NavLink>
+
+                      <NavLink
+                        to="/admin/sections"
+                        className={({ isActive }) =>
+                          `flex items-center px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white font-semibold'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                          }`
+                        }
+                      >
+                        <Layers className="w-3 h-3 mr-2" />
+                        <span>Section Management</span>
+                      </NavLink>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Subjects Management */}
+                <NavLink
+                  to="/admin/subjects"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Subjects Management</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="pt-4 px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
           Account &amp; Security
