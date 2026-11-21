@@ -1,0 +1,10 @@
+MONGO_URI = mongodb://127.0.0.1:27017/DMMS
+PORT = 8000
+
+
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+
+SMTP_EMAIL=shreejiitsolution120@gmail.com
+SMTP_PASSWORD=idzetsgooccvapsn
