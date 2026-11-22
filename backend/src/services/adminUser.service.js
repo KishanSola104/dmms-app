@@ -209,6 +209,8 @@ class AdminUserService {
     return {
       user: {
         userId: savedUser.userId,
+        employeeRef: savedEmployee._id,
+        employeeId: savedEmployee._id,
         fullName: savedEmployee.fullName,
         email: savedUser.email,
         mobileNumber: savedEmployee.mobileNumber,

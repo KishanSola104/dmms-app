@@ -26,6 +26,12 @@ import ClassManagementPage from './pages/admin/ClassManagementPage';
 import SectionManagementPage from './pages/admin/SectionManagementPage';
 import SubjectManagementPage from './pages/admin/SubjectManagementPage';
 
+// Module 3 Admin Pages
+import SubjectAllocationPage from './pages/admin/SubjectAllocationPage';
+import TeacherAssignmentPage from './pages/admin/TeacherAssignmentPage';
+import ExaminationManagementPage from './pages/admin/ExaminationManagementPage';
+import ExaminationSubjectConfigPage from './pages/admin/ExaminationSubjectConfigPage';
+
 function App() {
   return (
     <SchoolAuthProvider>
@@ -127,6 +133,43 @@ function App() {
                 element={
                   <AdminRoute>
                     <SubjectManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              {/* Module 3: Academic Management Routes (Admin Only) */}
+              <Route
+                path="/admin/subject-allocation"
+                element={
+                  <AdminRoute>
+                    <SubjectAllocationPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/teacher-assignment"
+                element={
+                  <AdminRoute>
+                    <TeacherAssignmentPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/examinations"
+                element={
+                  <AdminRoute>
+                    <ExaminationManagementPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/examinations/:examinationId/subjects"
+                element={
+                  <AdminRoute>
+                    <ExaminationSubjectConfigPage />
                   </AdminRoute>
                 }
               />

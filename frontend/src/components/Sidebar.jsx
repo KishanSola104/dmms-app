@@ -26,11 +26,16 @@ const Sidebar = () => {
   const { currentSchool, logoutSchool } = useSchoolAuth();
 
   // Expandable sections state
-  const isInsideAdmin = location.pathname.startsWith('/admin');
+  const isInsideAdmin = location.pathname.startsWith('/admin') && !location.pathname.startsWith('/admin/subject-allocation') && !location.pathname.startsWith('/admin/teacher-assignment') && !location.pathname.startsWith('/admin/examinations');
   const isInsideClasses = location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections');
+  const isInsideAcademicManagement =
+    location.pathname.startsWith('/admin/subject-allocation') ||
+    location.pathname.startsWith('/admin/teacher-assignment') ||
+    location.pathname.startsWith('/admin/examinations');
 
   const [adminSetupOpen, setAdminSetupOpen] = useState(true);
   const [classesSectionsOpen, setClassesSectionsOpen] = useState(true);
+  const [academicManagementOpen, setAcademicManagementOpen] = useState(true);
 
   // Auto-expand active branches if navigating
   useEffect(() => {
@@ -39,6 +44,9 @@ const Sidebar = () => {
     }
     if (isInsideClasses) {
       setClassesSectionsOpen(true);
+    }
+    if (isInsideAcademicManagement) {
+      setAcademicManagementOpen(true);
     }
   }, [location.pathname]);
 
@@ -238,6 +246,82 @@ const Sidebar = () => {
                 >
                   <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
                   <span>Subjects Management</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ADMIN ONLY: Academic Management Expandable Menu (Module 3) */}
+        {currentUser?.roleCode === 'ADMIN' && (
+          <div className="pt-2">
+            {/* Expandable Header */}
+            <button
+              type="button"
+              onClick={() => setAcademicManagementOpen(!academicManagementOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                isInsideAcademicManagement
+                  ? 'text-white bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center">
+                <GraduationCap className="w-4 h-4 mr-3 text-indigo-400" />
+                <span>Academic Management</span>
+              </div>
+              {academicManagementOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {/* Expandable Sub-items */}
+            {academicManagementOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                {/* 1. Subject Allocation */}
+                <NavLink
+                  to="/admin/subject-allocation"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Subject Allocation</span>
+                </NavLink>
+
+                {/* 2. Teacher Assignment */}
+                <NavLink
+                  to="/admin/teacher-assignment"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Teacher Assignment</span>
+                </NavLink>
+
+                {/* 3. Examination Management */}
+                <NavLink
+                  to="/admin/examinations"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Calendar className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Examination Management</span>
                 </NavLink>
               </div>
             )}
