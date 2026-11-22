@@ -44,8 +44,9 @@ const Sidebar = () => {
 
   const handleSchoolLogout = () => {
     if (window.confirm('Are you sure you want to change school? This will clear the current school session.')) {
+      logoutUser();
       logoutSchool();
-      navigate('/school-login');
+      navigate('/school-login', { replace: true });
     }
   };
 

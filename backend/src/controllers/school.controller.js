@@ -110,6 +110,12 @@ class SchoolController {
             message: `Contact person #${i + 1} email is invalid.`
           });
         }
+        if (!phoneRegex.test(cp.mobileNumber)) {
+          return res.status(400).json({
+            success: false,
+            message: `Contact person #${i + 1} mobile number is invalid.`
+          });
+        }
       }
 
       // 3. Validate Administrator
@@ -126,7 +132,121 @@ class SchoolController {
         return res.status(400).json({ success: false, message: 'Please enter a valid administrator mobile number.' });
       }
 
-      // 4. Validate Terms
+      // 4. Duplicate Prevention Checks (School vs Admin vs Contact Persons)
+      const normEmail = (val) => (val || '').trim().toLowerCase();
+      const normPhone = (val) => {
+        if (!val) return '';
+        let digits = String(val).replace(/\D/g, '');
+        if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+        if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+        return digits;
+      };
+      const normName = (val) => (val || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+      const nSchoolEmail = normEmail(schoolEmail);
+      const nSchoolMobile = normPhone(schoolMobile);
+      const nAdminEmail = normEmail(adminEmail);
+      const nAdminMobile = normPhone(adminMobile);
+      const nAdminName = normName(adminFullName);
+
+      // Rule 1: School Official Email cannot be the same as Administrator Email
+      if (nSchoolEmail === nAdminEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Official School Email and Administrator Email cannot be the same.'
+        });
+      }
+
+      // Rule 2: School Official Mobile Number cannot be the same as Administrator Mobile Number
+      if (nSchoolMobile === nAdminMobile) {
+        return res.status(400).json({
+          success: false,
+          message: 'Official School Mobile Number and Administrator Mobile Number cannot be the same.'
+        });
+      }
+
+      // Rule 4: Contact Persons must not have duplicate email addresses, mobile numbers, or full names among themselves
+      for (let i = 0; i < contactPersons.length; i++) {
+        const cpA = contactPersons[i];
+        const nCpAEmail = normEmail(cpA.email);
+        const nCpAMobile = normPhone(cpA.mobileNumber);
+        const nCpAName = normName(cpA.fullName);
+
+        for (let j = i + 1; j < contactPersons.length; j++) {
+          const cpB = contactPersons[j];
+          const nCpBEmail = normEmail(cpB.email);
+          const nCpBMobile = normPhone(cpB.mobileNumber);
+          const nCpBName = normName(cpB.fullName);
+
+          if (nCpAEmail === nCpBEmail) {
+            return res.status(400).json({
+              success: false,
+              message: `Contact Person #${i + 1} and Contact Person #${j + 1} cannot have the same email address (${cpA.email.trim()}).`
+            });
+          }
+          if (nCpAMobile === nCpBMobile) {
+            return res.status(400).json({
+              success: false,
+              message: `Contact Person #${i + 1} and Contact Person #${j + 1} cannot have the same mobile number (${cpA.mobileNumber.trim()}).`
+            });
+          }
+          if (nCpAName === nCpBName) {
+            return res.status(400).json({
+              success: false,
+              message: `Contact Person #${i + 1} and Contact Person #${j + 1} cannot have the same full name (${cpA.fullName.trim()}).`
+            });
+          }
+        }
+      }
+
+      // Rule 1 & Rule 2: School Official Email & Mobile cannot match any Contact Person
+      for (let i = 0; i < contactPersons.length; i++) {
+        const cp = contactPersons[i];
+        const nCpEmail = normEmail(cp.email);
+        const nCpMobile = normPhone(cp.mobileNumber);
+
+        if (nSchoolEmail === nCpEmail) {
+          return res.status(400).json({
+            success: false,
+            message: `Official School Email cannot be the same as Contact Person #${i + 1} Email (${cp.email.trim()}).`
+          });
+        }
+        if (nSchoolMobile === nCpMobile) {
+          return res.status(400).json({
+            success: false,
+            message: `Official School Mobile Number cannot be the same as Contact Person #${i + 1} Mobile Number (${cp.mobileNumber.trim()}).`
+          });
+        }
+      }
+
+      // Rule 3 & Rule 5: Administrator Email, Mobile, and Full Name cannot match any Contact Person
+      for (let i = 0; i < contactPersons.length; i++) {
+        const cp = contactPersons[i];
+        const nCpEmail = normEmail(cp.email);
+        const nCpMobile = normPhone(cp.mobileNumber);
+        const nCpName = normName(cp.fullName);
+
+        if (nAdminEmail === nCpEmail) {
+          return res.status(400).json({
+            success: false,
+            message: `Administrator Email cannot be the same as Contact Person #${i + 1} Email (${cp.email.trim()}).`
+          });
+        }
+        if (nAdminMobile === nCpMobile) {
+          return res.status(400).json({
+            success: false,
+            message: `Administrator Mobile Number cannot be the same as Contact Person #${i + 1} Mobile Number (${cp.mobileNumber.trim()}).`
+          });
+        }
+        if (nAdminName === nCpName) {
+          return res.status(400).json({
+            success: false,
+            message: `Administrator Full Name cannot be the same as Contact Person #${i + 1} Full Name (${cp.fullName.trim()}).`
+          });
+        }
+      }
+
+      // 5. Validate Terms
       if (!termsAccepted) {
         return res.status(400).json({
           success: false,

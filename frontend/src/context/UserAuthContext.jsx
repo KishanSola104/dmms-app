@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { useSchoolAuth } from './SchoolAuthContext';
 
 const UserAuthContext = createContext();
 
 export const UserAuthProvider = ({ children }) => {
+  const { isSchoolAuthenticated } = useSchoolAuth();
   const [userToken, setUserToken] = useState(() => localStorage.getItem('dmms_user_token') || null);
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('dmms_user_info');
@@ -11,9 +13,25 @@ export const UserAuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true);
 
+  // Synchronize with school authentication lifecycle
+  useEffect(() => {
+    const handleSchoolLogout = () => {
+      logoutUser();
+    };
+
+    window.addEventListener('dmms:school-logout', handleSchoolLogout);
+    return () => window.removeEventListener('dmms:school-logout', handleSchoolLogout);
+  }, []);
+
+  useEffect(() => {
+    if (!isSchoolAuthenticated) {
+      logoutUser();
+    }
+  }, [isSchoolAuthenticated]);
+
   useEffect(() => {
     const verifyUser = async () => {
-      if (userToken) {
+      if (userToken && isSchoolAuthenticated) {
         try {
           const res = await api.get('/profile/me');
           if (res.success && res.profile) {
@@ -40,7 +58,7 @@ export const UserAuthProvider = ({ children }) => {
     };
 
     verifyUser();
-  }, [userToken]);
+  }, [userToken, isSchoolAuthenticated]);
 
   const loginUser = (token, userData) => {
     setUserToken(token);
@@ -64,7 +82,7 @@ export const UserAuthProvider = ({ children }) => {
     });
   };
 
-  const isUserAuthenticated = !!userToken && !!currentUser;
+  const isUserAuthenticated = !!userToken && !!currentUser && isSchoolAuthenticated;
 
   return (
     <UserAuthContext.Provider

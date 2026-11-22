@@ -3,9 +3,18 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { Menu, X } from 'lucide-react';
+import { useSchoolAuth } from '../context/SchoolAuthContext';
+import { useUserAuth } from '../context/UserAuthContext';
 
 const DashboardLayout = ({ children }) => {
+  const { isSchoolAuthenticated } = useSchoolAuth();
+  const { isUserAuthenticated } = useUserAuth();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Authenticated dashboard layout must only render when both school and user authentication states are valid
+  if (!isSchoolAuthenticated || !isUserAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">

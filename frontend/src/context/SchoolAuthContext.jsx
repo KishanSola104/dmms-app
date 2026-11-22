@@ -48,6 +48,9 @@ export const SchoolAuthProvider = ({ children }) => {
     localStorage.removeItem('dmms_user_token');
     localStorage.removeItem('dmms_user_info');
     localStorage.removeItem('dmms_active_academic_year');
+
+    // Dispatch event to notify dependent contexts (UserAuthContext, AcademicYearContext)
+    window.dispatchEvent(new Event('dmms:school-logout'));
   };
 
   const isSchoolAuthenticated = !!schoolToken && !!currentSchool;

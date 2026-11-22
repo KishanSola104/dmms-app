@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../services/api';
+import { useSchoolAuth } from './SchoolAuthContext';
 import { useUserAuth } from './UserAuthContext';
 
 const AcademicYearContext = createContext();
 
 export const AcademicYearProvider = ({ children }) => {
+  const { isSchoolAuthenticated } = useSchoolAuth();
   const { isUserAuthenticated } = useUserAuth();
   const [academicYears, setAcademicYears] = useState([]);
   const [selectedYear, setSelectedYear] = useState(() => {
@@ -13,8 +15,23 @@ export const AcademicYearProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(false);
 
+  const resetAcademicYears = () => {
+    setAcademicYears([]);
+    setSelectedYear(null);
+    localStorage.removeItem('dmms_active_academic_year');
+  };
+
+  useEffect(() => {
+    const handleSchoolLogout = () => {
+      resetAcademicYears();
+    };
+
+    window.addEventListener('dmms:school-logout', handleSchoolLogout);
+    return () => window.removeEventListener('dmms:school-logout', handleSchoolLogout);
+  }, []);
+
   const fetchAcademicYears = async () => {
-    if (!isUserAuthenticated) return;
+    if (!isSchoolAuthenticated || !isUserAuthenticated) return;
     setLoading(true);
     try {
       const res = await api.get('/common/academic-years');
@@ -37,13 +54,12 @@ export const AcademicYearProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (isUserAuthenticated) {
+    if (isSchoolAuthenticated && isUserAuthenticated) {
       fetchAcademicYears();
     } else {
-      setAcademicYears([]);
-      setSelectedYear(null);
+      resetAcademicYears();
     }
-  }, [isUserAuthenticated]);
+  }, [isSchoolAuthenticated, isUserAuthenticated]);
 
   const switchAcademicYear = async (yearId) => {
     try {
@@ -74,6 +90,7 @@ export const AcademicYearProvider = ({ children }) => {
         selectedYear,
         switchAcademicYear,
         fetchAcademicYears,
+        resetAcademicYears,
         loading
       }}
     >

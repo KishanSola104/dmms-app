@@ -9,7 +9,7 @@ const Footer = ({ className = '' }) => {
         </p>
         <p className="font-semibold text-slate-200">
           <a
-            href="https://shreejiitsolutions.com"
+            href="https://shreeji-it-solution.netlify.app/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-400 hover:text-blue-300 underline underline-offset-4 transition-colors"

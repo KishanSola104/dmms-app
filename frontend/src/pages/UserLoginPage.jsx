@@ -22,7 +22,7 @@ import {
 const UserLoginPage = () => {
   const navigate = useNavigate();
   const { currentSchool, logoutSchool } = useSchoolAuth();
-  const { loginUser } = useUserAuth();
+  const { loginUser, logoutUser } = useUserAuth();
 
   const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState('');
@@ -124,8 +124,9 @@ const UserLoginPage = () => {
   };
 
   const handleChangeSchool = () => {
+    logoutUser();
     logoutSchool();
-    navigate('/school-login');
+    navigate('/school-login', { replace: true });
   };
 
   return (

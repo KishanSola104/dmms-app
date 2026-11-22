@@ -27,6 +27,7 @@ const SchoolRegisterPage = () => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [successData, setSuccessData] = useState(null);
 
   // Form State
@@ -54,11 +55,23 @@ const SchoolRegisterPage = () => {
     termsAccepted: false
   });
 
+  // Normalization Helpers
+  const normEmail = (val) => (val || '').trim().toLowerCase();
+  const normPhone = (val) => {
+    if (!val) return '';
+    let digits = String(val).replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+    if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+    return digits;
+  };
+  const normName = (val) => (val || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
   // Step 1 input handlers
   const handleSchoolChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setErrorMessage('');
+    setFieldErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   // Step 2 contact persons handlers
@@ -69,6 +82,7 @@ const SchoolRegisterPage = () => {
       return { ...prev, contactPersons: updated };
     });
     setErrorMessage('');
+    setFieldErrors(prev => ({ ...prev, [`cp_${index}_${field}`]: '' }));
   };
 
   const addContactPerson = () => {
@@ -77,6 +91,7 @@ const SchoolRegisterPage = () => {
         ...prev,
         contactPersons: [...prev.contactPersons, { fullName: '', email: '', mobileNumber: '', designation: '' }]
       }));
+      setErrorMessage('');
     }
   };
 
@@ -86,6 +101,8 @@ const SchoolRegisterPage = () => {
         ...prev,
         contactPersons: prev.contactPersons.filter((_, i) => i !== index)
       }));
+      setErrorMessage('');
+      setFieldErrors({});
     }
   };
 
@@ -94,47 +111,65 @@ const SchoolRegisterPage = () => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     setErrorMessage('');
+    setFieldErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   // Step Validations
   const validateStep1 = () => {
     const { schoolName, establishedYear, email, mobileNumber, address, websiteUrl } = formData;
+    const errors = {};
+
     if (!schoolName.trim()) {
-      setErrorMessage('Please enter the school full name.');
+      errors.schoolName = 'Please enter the school full name.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.schoolName);
       return false;
     }
     const currentYear = new Date().getFullYear();
     const estYear = parseInt(establishedYear, 10);
     if (!establishedYear || isNaN(estYear) || estYear < 1800 || estYear > currentYear) {
-      setErrorMessage(`Please enter a valid established year between 1800 and ${currentYear}.`);
+      errors.establishedYear = `Please enter a valid established year between 1800 and ${currentYear}.`;
+      setFieldErrors(errors);
+      setErrorMessage(errors.establishedYear);
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailRegex.test(email)) {
-      setErrorMessage('Please enter a valid school email address.');
+      errors.email = 'Please enter a valid school email address.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.email);
       return false;
     }
     const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
     if (!mobileNumber.trim() || !phoneRegex.test(mobileNumber)) {
-      setErrorMessage('Please enter a valid school contact number (7-15 digits).');
+      errors.mobileNumber = 'Please enter a valid school contact number (7-15 digits).';
+      setFieldErrors(errors);
+      setErrorMessage(errors.mobileNumber);
       return false;
     }
     if (!address.trim()) {
-      setErrorMessage('Please enter the complete school address.');
+      errors.address = 'Please enter the complete school address.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.address);
       return false;
     }
     if (websiteUrl && websiteUrl.trim()) {
       const urlPattern = /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,})(:\d{1,5})?(\/.*)?$/i;
       if (!urlPattern.test(websiteUrl.trim())) {
-        setErrorMessage('Please enter a valid website URL or leave it empty.');
+        errors.websiteUrl = 'Please enter a valid website URL or leave it empty.';
+        setFieldErrors(errors);
+        setErrorMessage(errors.websiteUrl);
         return false;
       }
     }
+    setFieldErrors({});
     return true;
   };
 
   const validateStep2 = () => {
-    const { contactPersons } = formData;
+    const { contactPersons, email: schoolEmail, mobileNumber: schoolMobile } = formData;
+    const errors = {};
+
     if (contactPersons.length < 2 || contactPersons.length > 3) {
       setErrorMessage('You must provide at least 2 and at most 3 contact persons.');
       return false;
@@ -143,50 +178,170 @@ const SchoolRegisterPage = () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
 
+    // Basic format checks
     for (let i = 0; i < contactPersons.length; i++) {
       const cp = contactPersons[i];
       if (!cp.fullName.trim()) {
-        setErrorMessage(`Please enter the full name for Contact Person #${i + 1}.`);
-        return false;
-      }
-      if (!cp.email.trim() || !emailRegex.test(cp.email)) {
-        setErrorMessage(`Please enter a valid email address for Contact Person #${i + 1}.`);
-        return false;
-      }
-      if (!cp.mobileNumber.trim() || !phoneRegex.test(cp.mobileNumber)) {
-        setErrorMessage(`Please enter a valid mobile number for Contact Person #${i + 1}.`);
+        errors[`cp_${i}_fullName`] = `Please enter the full name for Contact Person #${i + 1}.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors[`cp_${i}_fullName`]);
         return false;
       }
       if (!cp.designation.trim()) {
-        setErrorMessage(`Please specify the designation for Contact Person #${i + 1}.`);
+        errors[`cp_${i}_designation`] = `Please specify the designation for Contact Person #${i + 1}.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors[`cp_${i}_designation`]);
+        return false;
+      }
+      if (!cp.email.trim() || !emailRegex.test(cp.email)) {
+        errors[`cp_${i}_email`] = `Please enter a valid email address for Contact Person #${i + 1}.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors[`cp_${i}_email`]);
+        return false;
+      }
+      if (!cp.mobileNumber.trim() || !phoneRegex.test(cp.mobileNumber)) {
+        errors[`cp_${i}_mobileNumber`] = `Please enter a valid mobile number for Contact Person #${i + 1}.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors[`cp_${i}_mobileNumber`]);
         return false;
       }
     }
 
+    const nSchoolEmail = normEmail(schoolEmail);
+    const nSchoolMobile = normPhone(schoolMobile);
+
+    // Rule 1 & Rule 2: Contact Person details cannot duplicate Official School details
+    for (let i = 0; i < contactPersons.length; i++) {
+      const cp = contactPersons[i];
+      if (normEmail(cp.email) === nSchoolEmail) {
+        errors[`cp_${i}_email`] = `Official School Email cannot be the same as Contact Person #${i + 1} Email.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors[`cp_${i}_email`]);
+        return false;
+      }
+      if (normPhone(cp.mobileNumber) === nSchoolMobile) {
+        errors[`cp_${i}_mobileNumber`] = `Official School Mobile Number cannot be the same as Contact Person #${i + 1} Mobile Number.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors[`cp_${i}_mobileNumber`]);
+        return false;
+      }
+    }
+
+    // Rule 4: Contact Persons must not share duplicate emails, mobile numbers, or full names among themselves
+    for (let i = 0; i < contactPersons.length; i++) {
+      const cpA = contactPersons[i];
+      const nCpAEmail = normEmail(cpA.email);
+      const nCpAMobile = normPhone(cpA.mobileNumber);
+      const nCpAName = normName(cpA.fullName);
+
+      for (let j = i + 1; j < contactPersons.length; j++) {
+        const cpB = contactPersons[j];
+        const nCpBEmail = normEmail(cpB.email);
+        const nCpBMobile = normPhone(cpB.mobileNumber);
+        const nCpBName = normName(cpB.fullName);
+
+        if (nCpAEmail === nCpBEmail) {
+          errors[`cp_${j}_email`] = `Contact Person #${i + 1} and Contact Person #${j + 1} cannot share duplicate email address.`;
+          setFieldErrors(errors);
+          setErrorMessage(errors[`cp_${j}_email`]);
+          return false;
+        }
+        if (nCpAMobile === nCpBMobile) {
+          errors[`cp_${j}_mobileNumber`] = `Contact Person #${i + 1} and Contact Person #${j + 1} cannot share duplicate mobile number.`;
+          setFieldErrors(errors);
+          setErrorMessage(errors[`cp_${j}_mobileNumber`]);
+          return false;
+        }
+        if (nCpAName === nCpBName) {
+          errors[`cp_${j}_fullName`] = `Contact Person #${i + 1} and Contact Person #${j + 1} cannot share duplicate full name.`;
+          setFieldErrors(errors);
+          setErrorMessage(errors[`cp_${j}_fullName`]);
+          return false;
+        }
+      }
+    }
+
+    setFieldErrors({});
     return true;
   };
 
   const validateStep3 = () => {
-    const { adminFullName, adminEmail, adminMobile } = formData;
+    const { adminFullName, adminEmail, adminMobile, email: schoolEmail, mobileNumber: schoolMobile, contactPersons } = formData;
+    const errors = {};
+
     if (!adminFullName.trim()) {
-      setErrorMessage('Please enter the administrator full name.');
+      errors.adminFullName = 'Please enter the administrator full name.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.adminFullName);
       return false;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!adminEmail.trim() || !emailRegex.test(adminEmail)) {
-      setErrorMessage('Please enter a valid administrator email address.');
+      errors.adminEmail = 'Please enter a valid administrator email address.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.adminEmail);
       return false;
     }
     const phoneRegex = /^[0-9+\-\s()]{7,15}$/;
     if (!adminMobile.trim() || !phoneRegex.test(adminMobile)) {
-      setErrorMessage('Please enter a valid administrator mobile number.');
+      errors.adminMobile = 'Please enter a valid administrator mobile number.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.adminMobile);
       return false;
     }
+
+    const nSchoolEmail = normEmail(schoolEmail);
+    const nSchoolMobile = normPhone(schoolMobile);
+    const nAdminEmail = normEmail(adminEmail);
+    const nAdminMobile = normPhone(adminMobile);
+    const nAdminName = normName(adminFullName);
+
+    // Rule 1: Administrator Email vs Official School Email
+    if (nAdminEmail === nSchoolEmail) {
+      errors.adminEmail = 'Official School Email and Administrator Email cannot be the same.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.adminEmail);
+      return false;
+    }
+
+    // Rule 2: Administrator Mobile vs Official School Mobile
+    if (nAdminMobile === nSchoolMobile) {
+      errors.adminMobile = 'Official School Mobile Number and Administrator Mobile Number cannot be the same.';
+      setFieldErrors(errors);
+      setErrorMessage(errors.adminMobile);
+      return false;
+    }
+
+    // Rule 3 & Rule 5: Administrator details vs Contact Persons details
+    for (let i = 0; i < contactPersons.length; i++) {
+      const cp = contactPersons[i];
+      if (nAdminEmail === normEmail(cp.email)) {
+        errors.adminEmail = `Administrator Email cannot be the same as Contact Person #${i + 1} Email.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors.adminEmail);
+        return false;
+      }
+      if (nAdminMobile === normPhone(cp.mobileNumber)) {
+        errors.adminMobile = `Administrator Mobile Number cannot be the same as Contact Person #${i + 1} Mobile Number.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors.adminMobile);
+        return false;
+      }
+      if (nAdminName === normName(cp.fullName)) {
+        errors.adminFullName = `Administrator Full Name cannot be the same as Contact Person #${i + 1} Full Name.`;
+        setFieldErrors(errors);
+        setErrorMessage(errors.adminFullName);
+        return false;
+      }
+    }
+
+    setFieldErrors({});
     return true;
   };
 
   const handleNext = () => {
     setErrorMessage('');
+    setFieldErrors({});
     if (step === 1 && validateStep1()) {
       setStep(2);
     } else if (step === 2 && validateStep2()) {
@@ -198,6 +353,7 @@ const SchoolRegisterPage = () => {
 
   const handleBack = () => {
     setErrorMessage('');
+    setFieldErrors({});
     if (step > 1) {
       setStep(step - 1);
     }
@@ -206,6 +362,22 @@ const SchoolRegisterPage = () => {
   // Final Registration Submission
   const handleSubmitRegistration = async () => {
     setErrorMessage('');
+    setFieldErrors({});
+
+    // Comprehensive multi-step verification before submit
+    if (!validateStep1()) {
+      setStep(1);
+      return;
+    }
+    if (!validateStep2()) {
+      setStep(2);
+      return;
+    }
+    if (!validateStep3()) {
+      setStep(3);
+      return;
+    }
+
     if (!formData.termsAccepted) {
       setErrorMessage('You must accept the Terms and Conditions to complete school registration.');
       return;
@@ -370,8 +542,13 @@ const SchoolRegisterPage = () => {
                           value={formData.schoolName}
                           onChange={handleSchoolChange}
                           placeholder="e.g. Kishore Bharti Primary School"
-                          className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                            fieldErrors.schoolName ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                          } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all`}
                         />
+                        {fieldErrors.schoolName && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.schoolName}</p>
+                        )}
                       </div>
 
                       {/* Established Year */}
@@ -386,10 +563,15 @@ const SchoolRegisterPage = () => {
                             value={formData.establishedYear}
                             onChange={handleSchoolChange}
                             placeholder="e.g. 1995"
-                            className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all"
+                            className={`w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border ${
+                              fieldErrors.establishedYear ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all`}
                           />
                           <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                         </div>
+                        {fieldErrors.establishedYear && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.establishedYear}</p>
+                        )}
                       </div>
 
                       {/* Official Email */}
@@ -404,10 +586,15 @@ const SchoolRegisterPage = () => {
                             value={formData.email}
                             onChange={handleSchoolChange}
                             placeholder="admin@school.edu"
-                            className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all"
+                            className={`w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border ${
+                              fieldErrors.email ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all`}
                           />
                           <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                         </div>
+                        {fieldErrors.email && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.email}</p>
+                        )}
                       </div>
 
                       {/* Mobile Number */}
@@ -422,10 +609,15 @@ const SchoolRegisterPage = () => {
                             value={formData.mobileNumber}
                             onChange={handleSchoolChange}
                             placeholder="e.g. 9876543210"
-                            className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all"
+                            className={`w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border ${
+                              fieldErrors.mobileNumber ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all`}
                           />
                           <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                         </div>
+                        {fieldErrors.mobileNumber && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.mobileNumber}</p>
+                        )}
                       </div>
 
                       {/* Website URL */}
@@ -458,10 +650,15 @@ const SchoolRegisterPage = () => {
                             value={formData.address}
                             onChange={handleSchoolChange}
                             placeholder="Street, City, District, State, PIN Code"
-                            className="w-full pl-9 pr-3.5 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all"
+                            className={`w-full pl-9 pr-3.5 py-2 text-sm rounded-lg border ${
+                              fieldErrors.address ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden transition-all`}
                           />
                           <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                         </div>
+                        {fieldErrors.address && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.address}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -523,8 +720,13 @@ const SchoolRegisterPage = () => {
                                 value={contact.fullName}
                                 onChange={(e) => handleContactChange(idx, 'fullName', e.target.value)}
                                 placeholder="Contact Full Name"
-                                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                                className={`w-full px-3 py-2 text-xs rounded-lg border ${
+                                  fieldErrors[`cp_${idx}_fullName`] ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                                } focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                               />
+                              {fieldErrors[`cp_${idx}_fullName`] && (
+                                <p className="text-[11px] text-rose-600 mt-1">{fieldErrors[`cp_${idx}_fullName`]}</p>
+                              )}
                             </div>
 
                             <div>
@@ -536,8 +738,13 @@ const SchoolRegisterPage = () => {
                                 value={contact.designation}
                                 onChange={(e) => handleContactChange(idx, 'designation', e.target.value)}
                                 placeholder="e.g. Vice Principal, Trustee, Coordinator"
-                                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                                className={`w-full px-3 py-2 text-xs rounded-lg border ${
+                                  fieldErrors[`cp_${idx}_designation`] ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                                } focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                               />
+                              {fieldErrors[`cp_${idx}_designation`] && (
+                                <p className="text-[11px] text-rose-600 mt-1">{fieldErrors[`cp_${idx}_designation`]}</p>
+                              )}
                             </div>
 
                             <div>
@@ -549,8 +756,13 @@ const SchoolRegisterPage = () => {
                                 value={contact.email}
                                 onChange={(e) => handleContactChange(idx, 'email', e.target.value)}
                                 placeholder="person@school.edu"
-                                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                                className={`w-full px-3 py-2 text-xs rounded-lg border ${
+                                  fieldErrors[`cp_${idx}_email`] ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                                } focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                               />
+                              {fieldErrors[`cp_${idx}_email`] && (
+                                <p className="text-[11px] text-rose-600 mt-1">{fieldErrors[`cp_${idx}_email`]}</p>
+                              )}
                             </div>
 
                             <div>
@@ -562,8 +774,13 @@ const SchoolRegisterPage = () => {
                                 value={contact.mobileNumber}
                                 onChange={(e) => handleContactChange(idx, 'mobileNumber', e.target.value)}
                                 placeholder="9876543210"
-                                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                                className={`w-full px-3 py-2 text-xs rounded-lg border ${
+                                  fieldErrors[`cp_${idx}_mobileNumber`] ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                                } focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                               />
+                              {fieldErrors[`cp_${idx}_mobileNumber`] && (
+                                <p className="text-[11px] text-rose-600 mt-1">{fieldErrors[`cp_${idx}_mobileNumber`]}</p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -600,8 +817,13 @@ const SchoolRegisterPage = () => {
                           value={formData.adminFullName}
                           onChange={handleAdminChange}
                           placeholder="e.g. Kishan Solanki"
-                          className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                          className={`w-full px-3.5 py-2.5 text-sm rounded-lg border ${
+                            fieldErrors.adminFullName ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                          } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                         />
+                        {fieldErrors.adminFullName && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.adminFullName}</p>
+                        )}
                       </div>
 
                       <div>
@@ -615,10 +837,15 @@ const SchoolRegisterPage = () => {
                             value={formData.adminEmail}
                             onChange={handleAdminChange}
                             placeholder="admin.personal@gmail.com"
-                            className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                            className={`w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border ${
+                              fieldErrors.adminEmail ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                           />
                           <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                         </div>
+                        {fieldErrors.adminEmail && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.adminEmail}</p>
+                        )}
                       </div>
 
                       <div>
@@ -632,10 +859,15 @@ const SchoolRegisterPage = () => {
                             value={formData.adminMobile}
                             onChange={handleAdminChange}
                             placeholder="9876543210"
-                            className="w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                            className={`w-full pl-9 pr-3.5 py-2.5 text-sm rounded-lg border ${
+                              fieldErrors.adminMobile ? 'border-rose-400 ring-1 ring-rose-400' : 'border-slate-300'
+                            } focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden`}
                           />
                           <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                         </div>
+                        {fieldErrors.adminMobile && (
+                          <p className="text-xs text-rose-600 mt-1">{fieldErrors.adminMobile}</p>
+                        )}
                       </div>
                     </div>
                   </div>

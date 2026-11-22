@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useAcademicYear } from '../context/AcademicYearContext';
@@ -9,9 +9,16 @@ import logoImg from '../assets/logo.png';
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentSchool, isSchoolAuthenticated, logoutSchool } = useSchoolAuth();
   const { currentUser, isUserAuthenticated, logoutUser } = useUserAuth();
   const { academicYears, selectedYear, switchAcademicYear } = useAcademicYear();
+
+  // The authenticated dashboard layout must only render when both school and user auth states are valid,
+  // and never on unauthenticated layout routes (School Login, Register, User Login, Home).
+  const unauthenticatedPaths = ['/school-login', '/register-school', '/user-login', '/'];
+  const isUnauthenticatedPath = unauthenticatedPaths.includes(location.pathname);
+  const showDashboardHeader = isSchoolAuthenticated && isUserAuthenticated && !isUnauthenticatedPath;
 
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -60,7 +67,7 @@ const Header = () => {
           {/* Left: Logo */}
           <div className="flex items-center space-x-3">
             <Link
-              to={isUserAuthenticated ? '/dashboard' : '/'}
+              to={showDashboardHeader ? '/dashboard' : '/'}
               className="flex items-center space-x-2.5 focus:outline-hidden"
             >
               <img
@@ -83,7 +90,7 @@ const Header = () => {
             </Link>
 
             {/* School identifier pill when in dashboard */}
-            {isUserAuthenticated && currentSchool && (
+            {showDashboardHeader && currentSchool && (
               <div className="hidden lg:flex items-center ml-4 pl-4 border-l border-slate-200 space-x-2">
                 <Building2 className="w-4 h-4 text-slate-400" />
                 <span className="text-xs font-medium text-slate-600 truncate max-w-[200px]" title={currentSchool.schoolName}>
@@ -98,7 +105,7 @@ const Header = () => {
 
           {/* Right Section */}
           <div className="flex items-center space-x-3 sm:space-x-4">
-            {isUserAuthenticated ? (
+            {showDashboardHeader ? (
               <>
                 {/* 1. Academic Year Dropdown */}
                 <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700">
