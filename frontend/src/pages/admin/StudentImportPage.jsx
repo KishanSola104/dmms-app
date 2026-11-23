@@ -373,19 +373,20 @@ const StudentImportPage = () => {
                   <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase">
                     <tr>
                       <th className="py-2.5 px-3">Row</th>
+                      <th className="py-2.5 px-3">Roll No</th>
                       <th className="py-2.5 px-3">Adm No</th>
                       <th className="py-2.5 px-3">Student Name</th>
-                      <th className="py-2.5 px-3">Gender</th>
+                      <th className="py-2.5 px-3">Class</th>
+                      <th className="py-2.5 px-3">Section</th>
                       <th className="py-2.5 px-3">DOB</th>
-                      <th className="py-2.5 px-3">Class &amp; Section</th>
-                      <th className="py-2.5 px-3">Roll No</th>
-                      <th className="py-2.5 px-3">Guardian</th>
+                      <th className="py-2.5 px-3">Father Name</th>
+                      <th className="py-2.5 px-3">Mother Name</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {previewData.validRows.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="py-6 text-center text-slate-400 italic">
+                        <td colSpan="9" className="py-6 text-center text-slate-400 italic">
                           No valid rows found in this file. Please inspect the invalid rows tab.
                         </td>
                       </tr>
@@ -393,18 +394,24 @@ const StudentImportPage = () => {
                       previewData.validRows.map((r, i) => (
                         <tr key={i} className="hover:bg-slate-50/50">
                           <td className="py-2.5 px-3 font-mono text-slate-400">#{r.rowNumber}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{r.rollNumber || '—'}</td>
                           <td className="py-2.5 px-3 font-mono font-bold text-slate-800">
                             {r.admissionNumber || <span className="text-slate-400 italic">Auto</span>}
                           </td>
                           <td className="py-2.5 px-3 font-bold text-slate-900">{r.fullName}</td>
-                          <td className="py-2.5 px-3 capitalize">{r.gender?.toLowerCase()}</td>
-                          <td className="py-2.5 px-3 text-slate-600">{r.dateOfBirth}</td>
-                          <td className="py-2.5 px-3 font-medium text-slate-800">
-                            {r.className} - {r.sectionName}
-                          </td>
-                          <td className="py-2.5 px-3 font-mono text-slate-600">{r.rollNumber || '—'}</td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800">{r.className}</td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800">{r.sectionName}</td>
+                          <td className="py-2.5 px-3 text-slate-600">{r.dateOfBirth || '—'}</td>
                           <td className="py-2.5 px-3 text-slate-600">
-                            {r.guardianDetails?.[0]?.fullName} ({r.guardianDetails?.[0]?.mobileNumber})
+                            {r.fatherName ||
+                              r.guardianDetails?.find((g) => (g.relationship || '').toUpperCase() === 'FATHER')?.fullName ||
+                              r.guardianDetails?.[0]?.fullName ||
+                              '—'}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600">
+                            {r.motherName ||
+                              r.guardianDetails?.find((g) => (g.relationship || '').toUpperCase() === 'MOTHER')?.fullName ||
+                              (r.guardianDetails && r.guardianDetails[1] ? r.guardianDetails[1].fullName : '—')}
                           </td>
                         </tr>
                       ))
@@ -421,15 +428,18 @@ const StudentImportPage = () => {
                   <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase">
                     <tr>
                       <th className="py-2.5 px-3">Row</th>
+                      <th className="py-2.5 px-3">Roll No</th>
                       <th className="py-2.5 px-3">Adm No</th>
                       <th className="py-2.5 px-3">Student Name</th>
+                      <th className="py-2.5 px-3">Class</th>
+                      <th className="py-2.5 px-3">Section</th>
                       <th className="py-2.5 px-3">Validation Errors</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {previewData.invalidRows.length === 0 ? (
                       <tr>
-                        <td colSpan="4" className="py-6 text-center text-emerald-600 font-semibold">
+                        <td colSpan="7" className="py-6 text-center text-emerald-600 font-semibold">
                           Awesome! There are zero invalid rows in this file.
                         </td>
                       </tr>
@@ -437,8 +447,11 @@ const StudentImportPage = () => {
                       previewData.invalidRows.map((r, i) => (
                         <tr key={i} className="hover:bg-red-50/20 bg-red-50/10">
                           <td className="py-2.5 px-3 font-mono font-bold text-red-600">#{r.rowNumber}</td>
+                          <td className="py-2.5 px-3 font-mono text-slate-600">{r.rollNumber || '—'}</td>
                           <td className="py-2.5 px-3 font-mono text-slate-700">{r.admissionNumber || '—'}</td>
                           <td className="py-2.5 px-3 font-bold text-slate-900">{r.fullName || '—'}</td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800">{r.className || '—'}</td>
+                          <td className="py-2.5 px-3 font-medium text-slate-800">{r.sectionName || '—'}</td>
                           <td className="py-2.5 px-3 space-y-1">
                             {(r.errors || []).map((err, errIdx) => (
                               <span

@@ -12,10 +12,15 @@ const guardianSchema = new mongoose.Schema({
     trim: true,
     uppercase: true
   },
+  occupation: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   mobileNumber: {
     type: String,
-    required: [true, 'Guardian mobile number is required'],
-    trim: true
+    trim: true,
+    default: ''
   },
   email: {
     type: String,
@@ -59,8 +64,8 @@ const studentInfoSchema = new mongoose.Schema({
   },
   lastName: {
     type: String,
-    required: [true, 'Last name is required'],
-    trim: true
+    trim: true,
+    default: ''
   },
   dateOfBirth: {
     type: Date,
@@ -68,12 +73,38 @@ const studentInfoSchema = new mongoose.Schema({
   },
   gender: {
     type: String,
-    required: [true, 'Gender is required'],
+    required: false,
     enum: {
-      values: ['MALE', 'FEMALE', 'OTHER'],
+      values: ['MALE', 'FEMALE', 'OTHER', 'UNAVAILABLE', 'NOT_SPECIFIED'],
       message: 'Gender must be MALE, FEMALE, or OTHER'
     },
+    default: 'UNAVAILABLE',
     uppercase: true
+  },
+  address: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  bloodGroup: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  religion: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  fatherOccupation: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  motherOccupation: {
+    type: String,
+    trim: true,
+    default: ''
   },
   profilePhotoUrl: {
     type: String,
@@ -95,12 +126,7 @@ const studentInfoSchema = new mongoose.Schema({
   },
   guardianDetails: {
     type: [guardianSchema],
-    validate: {
-      validator: function(val) {
-        return Array.isArray(val) && val.length > 0;
-      },
-      message: 'At least one guardian detail is required'
-    }
+    default: []
   },
   admissionAcademicYearRef: {
     type: mongoose.Schema.Types.ObjectId,
@@ -141,9 +167,9 @@ studentInfoSchema.index({ schoolId: 1, firstName: 1, lastName: 1 });
 // Virtual for full name
 studentInfoSchema.virtual('fullName').get(function() {
   if (this.middleName) {
-    return `${this.firstName} ${this.middleName} ${this.lastName}`;
+    return `${this.firstName} ${this.middleName} ${this.lastName || ''}`.trim();
   }
-  return `${this.firstName} ${this.lastName}`;
+  return `${this.firstName} ${this.lastName || ''}`.trim();
 });
 
 module.exports = mongoose.model('StudentInfo', studentInfoSchema);
