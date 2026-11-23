@@ -32,6 +32,18 @@ import TeacherAssignmentPage from './pages/admin/TeacherAssignmentPage';
 import ExaminationManagementPage from './pages/admin/ExaminationManagementPage';
 import ExaminationSubjectConfigPage from './pages/admin/ExaminationSubjectConfigPage';
 
+// Module 4 Admin Pages
+import StudentAdmissionPage from './pages/admin/StudentAdmissionPage';
+import StudentListPage from './pages/admin/StudentListPage';
+import StudentProfilePage from './pages/admin/StudentProfilePage';
+import StudentEnrollmentPage from './pages/admin/StudentEnrollmentPage';
+import StudentPromotionPage from './pages/admin/StudentPromotionPage';
+import StudentImportPage from './pages/admin/StudentImportPage';
+import SchoolProfilePage from './pages/admin/SchoolProfilePage';
+
+// Common 404 Page
+import NotFoundPage from './pages/NotFoundPage';
+
 function App() {
   return (
     <SchoolAuthProvider>
@@ -174,8 +186,73 @@ function App() {
                 }
               />
 
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Module 4: Student Management Routes (Admin Only) */}
+              <Route
+                path="/admin/students"
+                element={
+                  <AdminRoute>
+                    <StudentListPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/students/admission"
+                element={
+                  <AdminRoute>
+                    <StudentAdmissionPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/students/enrollments"
+                element={
+                  <AdminRoute>
+                    <StudentEnrollmentPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/students/promotion"
+                element={
+                  <AdminRoute>
+                    <StudentPromotionPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/students/import"
+                element={
+                  <AdminRoute>
+                    <StudentImportPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/students/:studentId"
+                element={
+                  <AdminRoute>
+                    <StudentProfilePage />
+                  </AdminRoute>
+                }
+              />
+
+              {/* Module 4: School Profile Management (Admin Only) */}
+              <Route
+                path="/admin/school-profile"
+                element={
+                  <AdminRoute>
+                    <SchoolProfilePage />
+                  </AdminRoute>
+                }
+              />
+
+              {/* Fallback 404 Route */}
+              <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </BrowserRouter>
         </AcademicYearProvider>

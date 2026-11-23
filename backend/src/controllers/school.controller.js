@@ -459,6 +459,7 @@ class SchoolController {
           schoolName: school.schoolName,
           schoolCode: school.schoolCode,
           email: school.email,
+          schoolLogoUrl: school.schoolLogoUrl || '',
           mustChangePassword: school.mustChangePassword
         }
       });

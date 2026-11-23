@@ -7,7 +7,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://127.0.0.1:8000/api';
 
 async function runModule3Phase4Tests() {
   console.log('========================================================================');
@@ -280,16 +280,16 @@ async function runModule3Phase4Tests() {
   );
   test(unassignedRes.status === 400, 'Prevented configuring subjects for class not assigned to examination');
 
-  // 5.4 Validation: Empty components list rejected
-  const emptyCompsRes = await fetch(
+  // 5.4 Validation: Non-array components rejected
+  const nonArrayCompsRes = await fetch(
     `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${mathId}/configure`,
     {
       method: 'POST',
       headers: adminHeaders,
-      body: JSON.stringify({ components: [] })
+      body: JSON.stringify({ components: 'invalid-non-array' })
     }
   );
-  test(emptyCompsRes.status === 400, 'Rejected configuration with empty components array');
+  test(nonArrayCompsRes.status === 400, 'Rejected configuration with non-array components');
 
   // 5.5 Validation: Invalid or missing component name rejected
   const missingNameRes = await fetch(
@@ -496,6 +496,160 @@ async function runModule3Phase4Tests() {
   test(
     c3CheckRes.isConfigured === true && c3CheckRes.totalMaximumMarks === 40,
     'Class 3 received independent Mathematics config with 40 marks'
+  );
+
+  // ---------------------------------------------------------
+  // 5B. Phase 4 Component Default Logic & Zero-Component Compatibility Tests
+  // ---------------------------------------------------------
+  console.log('\n--- 5B. Testing Component Default Logic Update (Academic & Co-curricular) ---');
+
+  // 5B.1 Save Academic Subject (English) with Zero Components
+  const engZeroRes = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${engId}/configure`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({ components: [] })
+    }
+  ).then((r) => r.json());
+  test(engZeroRes.success === true, 'Saved Academic subject (English) with zero components');
+  test(engZeroRes.totalMaximumMarks === 0, 'Academic subject with zero components has totalMaximumMarks = 0');
+  test(engZeroRes.components.length === 0, 'Academic subject returns empty components array');
+
+  // 5B.2 Verify English is marked as Configured with 0 total marks
+  const c1ListAfterEngZero = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  const engInList = c1ListAfterEngZero.subjects.find((s) => s.subjectRef.toString() === engId.toString());
+  test(engInList.isConfigured === true, 'Academic subject saved with zero components is marked as configured');
+  test(engInList.totalMaximumMarks === 0, 'Academic subject in class list shows 0 marks');
+  test(engInList.components.length === 0, 'Academic subject in class list has 0 components');
+
+  // 5B.3 Academic Subject: Add custom components (Written renamed/modified + Oral added)
+  const engCustomRes = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${engId}/configure`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        components: [
+          { componentName: 'Written Exam', maximumMarks: 75 },
+          { componentName: 'Oral Presentation', maximumMarks: 25 }
+        ]
+      })
+    }
+  ).then((r) => r.json());
+  test(engCustomRes.success === true, 'Academic subject updated with custom/additional components');
+  test(engCustomRes.totalMaximumMarks === 100, 'Academic subject total recalculated to 100 marks');
+  test(engCustomRes.components.length === 2, 'Academic subject has 2 components saved');
+
+  // 5B.4 Academic Subject: Remove all components and re-save with zero components
+  const engReZeroRes = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${engId}/configure`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({ components: [] })
+    }
+  ).then((r) => r.json());
+  test(engReZeroRes.success === true, 'Academic subject components removed and saved with zero components');
+  test(engReZeroRes.totalMaximumMarks === 0, 'Academic subject total reset to 0 marks');
+  test(engReZeroRes.components.length === 0, 'Academic subject components array is empty');
+
+  // 5B.5 Allocate Co-curricular Subject (Art) to Class 1
+  const artAllocRes = await fetch(`${API_BASE}/admin/class-subjects`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      academicYearRef: ay1Id,
+      classRef: c1Id,
+      allocations: [
+        { subjectRef: artId, hasAdditionalComponents: false }
+      ]
+    })
+  }).then((r) => r.json());
+  test(artAllocRes.success === true, 'Allocated Co-curricular subject (Art) to Class 1');
+
+  // 5B.6 Co-curricular Subject: Initially unconfigured and identified as CO_CURRICULAR
+  const c1ListWithArt = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  const artInList = c1ListWithArt.subjects.find((s) => s.subjectRef.toString() === artId.toString());
+  test(artInList.isConfigured === false, 'New Co-curricular subject (Art) starts unconfigured');
+  test(artInList.subjectType === 'CO_CURRICULAR', 'Subject is correctly identified as CO_CURRICULAR');
+
+  // 5B.7 Co-curricular Subject: Save with zero components
+  const artZeroRes = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${artId}/configure`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({ components: [] })
+    }
+  ).then((r) => r.json());
+  test(artZeroRes.success === true, 'Saved Co-curricular subject with zero components');
+  test(artZeroRes.totalMaximumMarks === 0, 'Co-curricular subject total is 0 marks');
+  test(artZeroRes.components.length === 0, 'Co-curricular subject has 0 components');
+
+  // 5B.8 Co-curricular Subject: Optionally add components
+  const artWithCompsRes = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${artId}/configure`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        components: [
+          { componentName: 'Drawing & Painting', maximumMarks: 35 },
+          { componentName: 'Handicraft', maximumMarks: 15 }
+        ]
+      })
+    }
+  ).then((r) => r.json());
+  test(artWithCompsRes.success === true, 'Optionally added components to Co-curricular subject');
+  test(artWithCompsRes.totalMaximumMarks === 50, 'Co-curricular total calculated as 50 marks');
+  test(artWithCompsRes.components.length === 2, 'Co-curricular subject has 2 components');
+
+  // 5B.9 Co-curricular Subject: Remove components and save with zero components again
+  const artResetZeroRes = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${artId}/configure`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({ components: [] })
+    }
+  ).then((r) => r.json());
+  test(artResetZeroRes.success === true, 'Co-curricular components removed and re-saved with zero components');
+  test(artResetZeroRes.totalMaximumMarks === 0, 'Co-curricular total reset to 0 marks');
+  test(artResetZeroRes.components.length === 0, 'Co-curricular components array is empty');
+
+  // 5B.10 Verify existing saved configurations remain unchanged
+  const mathCheckAfter = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${mathId}`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  test(
+    mathCheckAfter.isConfigured === true && mathCheckAfter.totalMaximumMarks === 50 && mathCheckAfter.components.length === 2,
+    'Existing Class 1 Mathematics configuration preserved unchanged (50 marks, 2 components)'
+  );
+
+  const sciCheckAfter = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c1Id}/subjects/${sciId}`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  test(
+    sciCheckAfter.isConfigured === true && sciCheckAfter.totalMaximumMarks === 100 && sciCheckAfter.components.length === 2,
+    'Existing Class 1 Science configuration preserved unchanged (100 marks, 2 components)'
+  );
+
+  const c2MathCheckAfter = await fetch(
+    `${API_BASE}/admin/examinations/${examId}/classes/${c2Id}/subjects/${mathId}`,
+    { headers: adminHeaders }
+  ).then((r) => r.json());
+  test(
+    c2MathCheckAfter.isConfigured === true && c2MathCheckAfter.totalMaximumMarks === 40 && c2MathCheckAfter.components.length === 2,
+    'Existing Class 2 Mathematics configuration preserved unchanged (40 marks, 2 components)'
   );
 
   // ---------------------------------------------------------

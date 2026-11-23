@@ -69,6 +69,11 @@ const schoolInfoSchema = new mongoose.Schema({
     trim: true,
     default: ''
   },
+  schoolLogoUrl: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   passwordHash: {
     type: String,
     required: [true, 'School password hash is required']

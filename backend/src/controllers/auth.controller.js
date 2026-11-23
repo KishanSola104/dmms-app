@@ -41,6 +41,7 @@ class AuthController {
           establishedYear: req.school.establishedYear,
           address: req.school.address,
           websiteUrl: req.school.websiteUrl,
+          schoolLogoUrl: req.school.schoolLogoUrl || '',
           mustChangePassword: req.school.mustChangePassword
         }
       });

@@ -55,6 +55,7 @@ erDiagram
 | `mobileNumber` | String | Yes | — | — | — | Official school contact mobile |
 | `address` | String | Yes | — | — | — | Complete physical address of the institution |
 | `websiteUrl` | String | No | `''` | — | — | School website address |
+| `schoolLogoUrl` | String | No | `''` | — | — | Path to uploaded school institutional logo image (Module 4 Phase 6) |
 | `passwordHash` | String | Yes | — | — | — | Bcrypt hash of generated school password |
 | `mustChangePassword`| Boolean | No | `false` | — | — | Indicates if initial school password change is required |
 | `contactPersons` | Array [Subdoc] | Yes | — | Min: 2, Max: 3 | Embedded | 2 to 3 contact persons with fullName, email, mobileNumber, designation |
@@ -445,5 +446,136 @@ erDiagram
 **Indexes**:
 * `{ schoolId: 1, examinationSubjectRef: 1 }` (Lookup index for fetching all components of an examination subject)
 * `{ examinationSubjectRef: 1, componentName: 1 }` (**Compound Unique**: strictly prevents duplicate component names within the same subject configuration)
+
+---
+
+### 17. `student_info` *(Implemented in Module 4 – Phase 1)*
+* **Mongoose Model**: `StudentInfo`
+* **Collection Name**: `student_info`
+* **Purpose**: Permanent master registry of students, completely independent of academic-year-specific enrollment. Never permanently deleted through normal operations.
+
+| Field Name | Data Type | Required | Default Value | Enum / Allowed Values | References / Relations | Purpose & Notes |
+|---|---|---|---|---|---|---|
+| `_id` | ObjectId | Yes (auto) | Auto-generated | — | Primary Key | Unique Identifier |
+| `schoolRef` | ObjectId | Yes | — | — | Ref: `SchoolInfo` | Parent school document reference |
+| `schoolId` | String | Yes | — | — | — | Multi-tenant isolation key |
+| `admissionNumber` | String | Yes | — | Uppercase | — | School-scoped unique admission identifier (manual or auto) |
+| `firstName` | String | Yes | — | — | — | Student first name |
+| `middleName` | String | No | `''` | — | — | Student middle name |
+| `lastName` | String | Yes | — | — | — | Student last name |
+| `dateOfBirth` | Date | Yes | — | Valid past date | — | Student date of birth |
+| `gender` | String | Yes | — | `'MALE'`, `'FEMALE'`, `'OTHER'` | — | Gender identity |
+| `profilePhotoUrl` | String | No | `''` | — | — | Relative path/URL to uploaded student portrait |
+| `contact.phone` | String | No | `''` | — | — | Student phone number |
+| `contact.email` | String | No | `''` | — | — | Student personal email address |
+| `guardianDetails` | Array (Object) | Yes | — | At least 1 entry | — | Array of parent/guardian objects |
+| `guardianDetails[].fullName` | String | Yes | — | — | — | Guardian full name |
+| `guardianDetails[].relationship` | String | Yes | — | `'FATHER'`, `'MOTHER'`, `'GUARDIAN'`, `'OTHER'` | — | Relationship with student |
+| `guardianDetails[].mobileNumber` | String | Yes | — | — | — | 10-digit primary emergency contact number |
+| `guardianDetails[].email` | String | No | `''` | — | — | Guardian email |
+| `guardianDetails[].isPrimaryContact` | Boolean | Yes | `false` | — | — | Flag identifying primary guardian contact |
+| `admissionAcademicYearRef` | ObjectId | Yes | — | — | Ref: `AcademicYearInfo` | Original academic session of student admission |
+| `admissionClassRef` | ObjectId | Yes | — | — | Ref: `ClassInfo` | Original entry class upon admission |
+| `admissionDate` | Date | Yes | Current Date | — | — | Date student was formally admitted |
+| `status` | String | Yes | `'ACTIVE'` | `'ACTIVE'`, `'INACTIVE'`, `'TRANSFERRED'`, `'ALUMNI'` | — | Operational master status |
+| `createdAt` | Date | Yes (auto) | Current Date | — | — | Record creation timestamp |
+| `updatedAt` | Date | Yes (auto) | Current Date | — | — | Last modification timestamp |
+
+**Indexes**:
+* `{ schoolId: 1, admissionNumber: 1 }` (**Compound Unique**: guarantees unique admission numbers per school)
+* `{ schoolId: 1, status: 1 }` (Lookup index for active student queries)
+* `{ schoolId: 1, admissionClassRef: 1 }` (Lookup index by entry class)
+* `{ schoolId: 1, admissionAcademicYearRef: 1 }` (Lookup index by admission cohort)
+* `{ schoolId: 1, firstName: 1, lastName: 1 }` (Compound name search index)
+
+---
+
+### 18. `student_enrollment_info` *(Implemented in Module 4 – Phase 1)*
+* **Mongoose Model**: `StudentEnrollmentInfo`
+* **Collection Name**: `student_enrollment_info`
+* **Purpose**: Records academic-year-specific placement of a student in a class and section, tracking roll numbers and operational status.
+
+| Field Name | Data Type | Required | Default Value | Enum / Allowed Values | References / Relations | Purpose & Notes |
+|---|---|---|---|---|---|---|
+| `_id` | ObjectId | Yes (auto) | Auto-generated | — | Primary Key | Unique Identifier |
+| `schoolRef` | ObjectId | Yes | — | — | Ref: `SchoolInfo` | Parent school document reference |
+| `schoolId` | String | Yes | — | — | — | Multi-tenant isolation key |
+| `studentRef` | ObjectId | Yes | — | — | Ref: `StudentInfo` | Student master document reference |
+| `academicYearRef` | ObjectId | Yes | — | — | Ref: `AcademicYearInfo` | Academic session reference |
+| `classRef` | ObjectId | Yes | — | — | Ref: `ClassInfo` | Enrolled Class reference |
+| `sectionRef` | ObjectId | Yes | — | — | Ref: `SectionInfo` | Enrolled Section reference |
+| `rollNumber` | String | No | `''` | — | — | Class roll number within section |
+| `enrollmentDate` | Date | Yes | Current Date | — | — | Placement date in section |
+| `status` | String | Yes | `'ACTIVE'` | `'ACTIVE'`, `'COMPLETED'`, `'WITHDRAWN'`, `'TRANSFERRED'` | — | Academic enrollment status |
+| `promotionOutcome` | String | No | `null` | `'PROMOTED'`, `'REPEATED'`, `'NOT_PROMOTED'`, `null` | — | Outcome at conclusion of academic year |
+| `remarks` | String | No | `''` | — | — | Enrollment or placement notes |
+| `createdAt` | Date | Yes (auto) | Current Date | — | — | Record creation timestamp |
+| `updatedAt` | Date | Yes (auto) | Current Date | — | — | Last modification timestamp |
+
+**Indexes**:
+* `{ schoolId: 1, academicYearRef: 1, studentRef: 1 }` (**Compound Unique**: guarantees a student has only ONE enrollment per academic year)
+* `{ schoolId: 1, academicYearRef: 1, classRef: 1, sectionRef: 1, rollNumber: 1 }` (**Partial Compound Unique**: ensures non-empty roll numbers are unique within a section when status is ACTIVE)
+* `{ schoolId: 1, studentRef: 1 }` (Lookup index for student historical enrollments)
+* `{ schoolId: 1, academicYearRef: 1, classRef: 1, sectionRef: 1, status: 1 }` (Lookup index for class rosters and capacity checks)
+
+---
+
+### 19. `student_enrollment_history_info` *(Implemented in Module 4 – Phase 1)*
+* **Mongoose Model**: `StudentEnrollmentHistoryInfo`
+* **Collection Name**: `student_enrollment_history_info`
+* **Purpose**: Immutable audit log of all student academic placements, transfers, promotions, and repetitions over time.
+
+| Field Name | Data Type | Required | Default Value | Enum / Allowed Values | References / Relations | Purpose & Notes |
+|---|---|---|---|---|---|---|
+| `_id` | ObjectId | Yes (auto) | Auto-generated | — | Primary Key | Unique Identifier |
+| `schoolRef` | ObjectId | Yes | — | — | Ref: `SchoolInfo` | Parent school document reference |
+| `schoolId` | String | Yes | — | — | — | Multi-tenant isolation key |
+| `studentRef` | ObjectId | Yes | — | — | Ref: `StudentInfo` | Student master document reference |
+| `enrollmentRef` | ObjectId | Yes | — | — | Ref: `StudentEnrollmentInfo` | Associated enrollment record |
+| `academicYearRef` | ObjectId | Yes | — | — | Ref: `AcademicYearInfo` | Academic session during change |
+| `previousClassRef` | ObjectId | No | `null` | — | Ref: `ClassInfo` | Previous class (null on initial admission) |
+| `previousSectionRef` | ObjectId | No | `null` | — | Ref: `SectionInfo` | Previous section (null on initial admission) |
+| `newClassRef` | ObjectId | Yes | — | — | Ref: `ClassInfo` | New target class reference |
+| `newSectionRef` | ObjectId | Yes | — | — | Ref: `SectionInfo` | New target section reference |
+| `changeType` | String | Yes | — | `'ADMISSION'`, `'PROMOTION'`, `'REPETITION'`, `'SECTION_TRANSFER'`, `'CLASS_TRANSFER'` | — | Type of academic transition |
+| `remarks` | String | No | `''` | — | — | Transition context or administrative notes |
+| `changedBy` | ObjectId | No | `null` | — | Ref: `UserInfo` | Staff user who performed the transition |
+| `changedAt` | Date | Yes | Current Date | — | — | Precise timestamp of transition |
+| `createdAt` | Date | Yes (auto) | Current Date | — | — | Record creation timestamp |
+| `updatedAt` | Date | Yes (auto) | Current Date | — | — | Last modification timestamp |
+
+**Indexes**:
+* `{ schoolId: 1, studentRef: 1 }` (Lookup index for student's full transition history)
+* `{ schoolId: 1, enrollmentRef: 1 }` (Lookup index for changes on an enrollment)
+* `{ schoolId: 1, academicYearRef: 1 }` (Lookup index for batch movements)
+
+---
+
+### 20. `student_import_batch_info` *(Implemented in Module 4 – Phase 1)*
+* **Mongoose Model**: `StudentImportBatchInfo`
+* **Collection Name**: `student_import_batch_info`
+* **Purpose**: Tracks batch Excel student import operations, maintaining audit history and row-level error telemetry.
+
+| Field Name | Data Type | Required | Default Value | Enum / Allowed Values | References / Relations | Purpose & Notes |
+|---|---|---|---|---|---|---|
+| `_id` | ObjectId | Yes (auto) | Auto-generated | — | Primary Key | Unique Identifier |
+| `schoolRef` | ObjectId | Yes | — | — | Ref: `SchoolInfo` | Parent school document reference |
+| `schoolId` | String | Yes | — | — | — | Multi-tenant isolation key |
+| `academicYearRef` | ObjectId | Yes | — | — | Ref: `AcademicYearInfo` | Academic session of import |
+| `fileName` | String | Yes | — | — | — | Name of uploaded spreadsheet |
+| `importType` | String | Yes | — | `'NEW_ADMISSION'`, `'EXISTING_ENROLLMENT'` | — | Batch ingestion mode |
+| `totalRecords` | Number | No | `0` | — | — | Total candidate rows parsed |
+| `successfulRecords` | Number | No | `0` | — | — | Total successfully ingested records |
+| `failedRecords` | Number | No | `0` | — | — | Total rejected records |
+| `status` | String | No | `'PROCESSING'` | `'PROCESSING'`, `'COMPLETED'`, `'FAILED'` | — | Import lifecycle state |
+| `errors` | Array (Object) | No | `[]` | — | — | Row-level validation failure details |
+| `importedBy` | ObjectId | No | `null` | — | Ref: `UserInfo` | Admin staff responsible for import |
+| `importedAt` | Date | Yes | Current Date | — | — | Batch execution timestamp |
+| `createdAt` | Date | Yes (auto) | Current Date | — | — | Record creation timestamp |
+| `updatedAt` | Date | Yes (auto) | Current Date | — | — | Last modification timestamp |
+
+**Indexes**:
+* `{ schoolId: 1, academicYearRef: 1 }` (Lookup index for import audits)
+* `{ schoolId: 1, importedAt: -1 }` (Recent imports sorting index)
 
 

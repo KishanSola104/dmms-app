@@ -177,18 +177,19 @@ class ExaminationSubjectService {
       throw err;
     }
 
-    // 4. Validate Components
-    if (!Array.isArray(components) || components.length === 0) {
-      const err = new Error('At least one examination marks component is required.');
+    // 4. Validate Components (Zero components are allowed for both Academic and Co-curricular subjects)
+    if (components !== undefined && components !== null && !Array.isArray(components)) {
+      const err = new Error('Components must be an array.');
       err.statusCode = 400;
       throw err;
     }
 
+    const componentList = Array.isArray(components) ? components : [];
     const seenNames = new Set();
     const sanitizedComponents = [];
 
-    for (let i = 0; i < components.length; i++) {
-      const comp = components[i];
+    for (let i = 0; i < componentList.length; i++) {
+      const comp = componentList[i];
       if (!comp.componentName || typeof comp.componentName !== 'string' || !comp.componentName.trim()) {
         const err = new Error(`Component name is required for component #${i + 1}.`);
         err.statusCode = 400;
@@ -218,7 +219,7 @@ class ExaminationSubjectService {
       });
     }
 
-    // 5. Automatic backend total calculation (Frontend is never trusted for totals)
+    // 5. Automatic backend total calculation (If there are no components, total is 0)
     const totalMaximumMarks = sanitizedComponents.reduce((sum, c) => sum + c.maximumMarks, 0);
 
     // 6. Find or create ExaminationSubjectInfo
@@ -267,7 +268,9 @@ class ExaminationSubjectService {
       sequence: c.sequence || index + 1
     }));
 
-    const savedComponents = await ExaminationComponentInfo.insertMany(componentDocs);
+    const savedComponents = componentDocs.length > 0
+      ? await ExaminationComponentInfo.insertMany(componentDocs)
+      : [];
 
     return {
       examinationSubject: examSubject,
@@ -375,9 +378,7 @@ class ExaminationSubjectService {
         examinationSubjectRef: src._id
       }).sort({ sequence: 1 }).lean();
 
-      if (srcComponents.length === 0) continue;
-
-      // Configure for target class independently
+      // Configure for target class independently (supports 0 or more components)
       await this.configureSubjectMarks(schoolId, schoolRef, {
         examinationId,
         classId: targetClassId,

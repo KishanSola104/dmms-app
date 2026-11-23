@@ -109,18 +109,25 @@ const ExaminationSubjectConfigPage = () => {
     setCurrentSubject(sub);
     setModalError('');
 
-    if (sub.isConfigured && sub.components && sub.components.length > 0) {
+    if (sub.isConfigured) {
+      // Existing saved configuration: preserve saved components without reinserting Written
       setComponentsList(
-        sub.components.map((c) => ({
+        (sub.components || []).map((c) => ({
           componentName: c.componentName,
           maximumMarks: c.maximumMarks.toString()
         }))
       );
     } else {
-      // Default initial component
-      setComponentsList([
-        { componentName: 'Written', maximumMarks: '50' }
-      ]);
+      // New subject configuration:
+      // Academic subjects default to "Written" (50 marks); Co-curricular subjects start empty
+      const isCoCurricular = (sub.subjectType || '').toUpperCase() === 'CO_CURRICULAR';
+      if (isCoCurricular) {
+        setComponentsList([]);
+      } else {
+        setComponentsList([
+          { componentName: 'Written', maximumMarks: '50' }
+        ]);
+      }
     }
 
     setIsConfigModalOpen(true);
@@ -133,10 +140,6 @@ const ExaminationSubjectConfigPage = () => {
 
   // Remove Component Row
   const handleRemoveComponentRow = (index) => {
-    if (componentsList.length === 1) {
-      setModalError('At least one examination component is required.');
-      return;
-    }
     setModalError('');
     setComponentsList((prev) => prev.filter((_, idx) => idx !== index));
   };
@@ -162,12 +165,7 @@ const ExaminationSubjectConfigPage = () => {
     e.preventDefault();
     setModalError('');
 
-    // Validations
-    if (componentsList.length === 0) {
-      setModalError('At least one component is required.');
-      return;
-    }
-
+    // Validations: If components exist, validate names, duplicates, and positive marks
     const seen = new Set();
     for (let i = 0; i < componentsList.length; i++) {
       const comp = componentsList[i];
@@ -205,7 +203,9 @@ const ExaminationSubjectConfigPage = () => {
       if (res.success) {
         setAlert({
           type: 'success',
-          message: `Marks structure for "${currentSubject.subjectName}" configured successfully! Total: ${res.totalMaximumMarks} marks.`
+          message: componentsList.length > 0
+            ? `Marks structure for "${currentSubject.subjectName}" configured successfully! Total: ${res.totalMaximumMarks} marks.`
+            : `Marks structure for "${currentSubject.subjectName}" saved with zero components (Total: 0 marks).`
         });
         setIsConfigModalOpen(false);
         fetchClassSubjects(selectedClassId);
@@ -536,10 +536,14 @@ const ExaminationSubjectConfigPage = () => {
                               </span>
                             ))}
                           </div>
+                        ) : sub.isConfigured ? (
+                          <span className="text-[11px] text-slate-400 italic">
+                            No components (0 marks)
+                          </span>
                         ) : (
                           <span className="text-[11px] text-amber-400/80 italic flex items-center">
                             <AlertCircle className="w-3.5 h-3.5 mr-1" />
-                            No components configured
+                            Not configured
                           </span>
                         )}
                       </td>
@@ -607,6 +611,20 @@ const ExaminationSubjectConfigPage = () => {
                   <span className="text-white font-semibold">{selectedClass?.className}</span>
                 </div>
                 <div>
+                  <span className="text-slate-400">Subject Type: </span>
+                  <span
+                    className={`font-semibold ${
+                      currentSubject?.subjectType === 'CO_CURRICULAR'
+                        ? 'text-purple-400'
+                        : 'text-blue-400'
+                    }`}
+                  >
+                    {currentSubject?.subjectType === 'CO_CURRICULAR'
+                      ? 'Co-curricular (Co-Scholastic)'
+                      : 'Academic (Scholastic)'}
+                  </span>
+                </div>
+                <div>
                   <span className="text-slate-400">Subject Code: </span>
                   <span className="text-white font-mono font-semibold">{currentSubject?.subjectCode}</span>
                 </div>
@@ -634,48 +652,56 @@ const ExaminationSubjectConfigPage = () => {
                   </button>
                 </div>
 
-                <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
-                  {componentsList.map((comp, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center space-x-2 bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/60"
-                    >
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          placeholder="e.g. Written, Oral, Practical"
-                          value={comp.componentName}
-                          onChange={(e) => handleUpdateComponent(idx, 'componentName', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-                          required
-                        />
-                      </div>
-                      <div className="w-32">
-                        <input
-                          type="number"
-                          placeholder="Max Marks"
-                          min="1"
-                          max="500"
-                          value={comp.maximumMarks}
-                          onChange={(e) => handleUpdateComponent(idx, 'maximumMarks', e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-right font-mono"
-                          required
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveComponentRow(idx)}
-                        disabled={componentsList.length === 1}
-                        className={`p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors ${
-                          componentsList.length === 1 ? 'opacity-30 cursor-not-allowed' : ''
-                        }`}
-                        title="Remove Component"
+                {componentsList.length === 0 ? (
+                  <div className="py-6 px-4 text-center rounded-lg border border-dashed border-slate-700 bg-slate-800/30 text-slate-400">
+                    <p className="text-xs font-medium">No examination components added.</p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {currentSubject?.subjectType === 'CO_CURRICULAR'
+                        ? 'Co-curricular subjects can be saved with zero components for direct overall assessment. Click "Add Component" above if marks components are needed.'
+                        : 'Academic subjects can be saved with zero components. Click "Add Component" above to define examination components.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-1">
+                    {componentsList.map((comp, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center space-x-2 bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/60"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="e.g. Written, Oral, Practical"
+                            value={comp.componentName}
+                            onChange={(e) => handleUpdateComponent(idx, 'componentName', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                            required
+                          />
+                        </div>
+                        <div className="w-32">
+                          <input
+                            type="number"
+                            placeholder="Max Marks"
+                            min="1"
+                            max="500"
+                            value={comp.maximumMarks}
+                            onChange={(e) => handleUpdateComponent(idx, 'maximumMarks', e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-right font-mono"
+                            required
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveComponentRow(idx)}
+                          className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                          title="Remove Component"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Live Backend Total Preview */}

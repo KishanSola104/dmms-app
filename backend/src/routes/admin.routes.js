@@ -11,6 +11,13 @@ const AdminClassSubjectController = require('../controllers/adminClassSubject.co
 const AdminTeacherAssignmentController = require('../controllers/adminTeacherAssignment.controller');
 const AdminExaminationController = require('../controllers/adminExamination.controller');
 const AdminExaminationSubjectController = require('../controllers/adminExaminationSubject.controller');
+const AdminStudentController = require('../controllers/adminStudent.controller');
+const AdminStudentImportExportController = require('../controllers/adminStudentImportExport.controller');
+const AdminSchoolProfileController = require('../controllers/adminSchoolProfile.controller');
+const upload = require('../middlewares/upload.middleware');
+const logoUpload = require('../middlewares/logoUpload.middleware');
+const multer = require('multer');
+const uploadMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Enforce authentication & ADMIN role for all administrative endpoints
 router.use(verifyUserAuth, authorizeRoles('ADMIN'));
@@ -96,5 +103,50 @@ router.post('/examinations/:examinationId/classes/:classId/subjects/:subjectId/c
 router.get('/examinations/:examinationId/classes/:classId/subjects/:subjectId', AdminExaminationSubjectController.getSubjectConfiguration);
 router.delete('/examinations/subjects/:examinationSubjectId', AdminExaminationSubjectController.removeSubjectConfiguration);
 router.post('/examinations/:examinationId/classes/:classId/copy-from/:sourceClassId', AdminExaminationSubjectController.copyClassConfiguration);
+
+// ==========================================
+// 9. MODULE 4 - STUDENT MANAGEMENT
+// ==========================================
+router.get('/students/next-admission-number', AdminStudentController.getNextAdmissionNumber);
+router.get('/students/next-roll-number', AdminStudentController.getNextRollNumber);
+router.post('/students/admission', AdminStudentController.admitStudent);
+router.post('/students/upload-photo', upload.single('photo'), AdminStudentController.uploadPhoto);
+router.get('/students', AdminStudentController.listStudents);
+router.get('/students/:studentId', AdminStudentController.getStudentById);
+router.put('/students/:studentId', AdminStudentController.updateStudent);
+router.patch('/students/:studentId/status', AdminStudentController.toggleStudentStatus);
+
+// ==========================================
+// 10. MODULE 4 - ENROLLMENT & TRANSFER MANAGEMENT (PHASE 3)
+// ==========================================
+router.get('/enrollments', AdminStudentController.getSectionEnrollmentSummary);
+router.get('/enrollments/unenrolled', AdminStudentController.getUnenrolledStudents);
+router.post('/enrollments', AdminStudentController.enrollStudent);
+router.put('/enrollments/:enrollmentId', AdminStudentController.updateEnrollment);
+router.post('/enrollments/:enrollmentId/transfer', AdminStudentController.transferStudentSection);
+
+// ==========================================
+// 11. MODULE 4 - STUDENT PROMOTION MANAGEMENT (PHASE 4)
+// ==========================================
+router.get('/promotions/source-students', AdminStudentController.getSourceStudentsForPromotion);
+router.post('/promotions/preview-distribution', AdminStudentController.previewPromotionDistribution);
+router.post('/promotions/execute', AdminStudentController.executePromotions);
+
+// ==========================================
+// 12. MODULE 4 - EXCEL IMPORT, EXPORT & PDF REPORTS (PHASE 5)
+// ==========================================
+router.get('/students/import/template', AdminStudentImportExportController.downloadTemplate);
+router.post('/students/import/preview', uploadMemory.single('file'), AdminStudentImportExportController.previewImport);
+router.post('/students/import/commit', AdminStudentImportExportController.commitImport);
+router.get('/students/export/excel', AdminStudentImportExportController.exportStudentsExcel);
+router.get('/students/:studentId/export/pdf', AdminStudentImportExportController.exportStudentPDF);
+router.get('/classes/:classId/sections/:sectionId/export/pdf', AdminStudentImportExportController.exportClassListPDF);
+
+// ==========================================
+// 13. MODULE 4 - SCHOOL PROFILE MANAGEMENT (PHASE 6)
+// ==========================================
+router.get('/school-profile', AdminSchoolProfileController.getSchoolProfile);
+router.put('/school-profile', AdminSchoolProfileController.updateSchoolProfile);
+router.post('/school-profile/logo', logoUpload.single('logo'), AdminSchoolProfileController.uploadLogo);
 
 module.exports = router;

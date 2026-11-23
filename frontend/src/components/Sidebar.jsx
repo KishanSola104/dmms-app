@@ -14,7 +14,11 @@ import {
   GraduationCap,
   BookOpen,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  UserPlus,
+  ArrowRightLeft,
+  TrendingUp,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
@@ -26,16 +30,23 @@ const Sidebar = () => {
   const { currentSchool, logoutSchool } = useSchoolAuth();
 
   // Expandable sections state
-  const isInsideAdmin = location.pathname.startsWith('/admin') && !location.pathname.startsWith('/admin/subject-allocation') && !location.pathname.startsWith('/admin/teacher-assignment') && !location.pathname.startsWith('/admin/examinations');
+  const isInsideAdmin =
+    location.pathname.startsWith('/admin') &&
+    !location.pathname.startsWith('/admin/subject-allocation') &&
+    !location.pathname.startsWith('/admin/teacher-assignment') &&
+    !location.pathname.startsWith('/admin/examinations') &&
+    !location.pathname.startsWith('/admin/students');
   const isInsideClasses = location.pathname.startsWith('/admin/classes') || location.pathname.startsWith('/admin/sections');
   const isInsideAcademicManagement =
     location.pathname.startsWith('/admin/subject-allocation') ||
     location.pathname.startsWith('/admin/teacher-assignment') ||
     location.pathname.startsWith('/admin/examinations');
+  const isInsideStudentManagement = location.pathname.startsWith('/admin/students');
 
   const [adminSetupOpen, setAdminSetupOpen] = useState(true);
   const [classesSectionsOpen, setClassesSectionsOpen] = useState(true);
   const [academicManagementOpen, setAcademicManagementOpen] = useState(true);
+  const [studentManagementOpen, setStudentManagementOpen] = useState(true);
 
   // Auto-expand active branches if navigating
   useEffect(() => {
@@ -47,6 +58,9 @@ const Sidebar = () => {
     }
     if (isInsideAcademicManagement) {
       setAcademicManagementOpen(true);
+    }
+    if (isInsideStudentManagement) {
+      setStudentManagementOpen(true);
     }
   }, [location.pathname]);
 
@@ -78,9 +92,18 @@ const Sidebar = () => {
       {/* School Card in Sidebar */}
       <div className="p-4 border-b border-slate-800 bg-slate-950/40">
         <div className="flex items-start space-x-3">
-          <div className="p-2 bg-blue-600/10 rounded-lg border border-blue-500/20 text-blue-400 mt-0.5">
-            <Building className="w-5 h-5" />
-          </div>
+          {currentSchool?.schoolLogoUrl ? (
+            <img
+              src={currentSchool.schoolLogoUrl}
+              alt="School Logo"
+              className="w-9 h-9 rounded-lg object-contain bg-white/10 p-1 border border-slate-700 mt-0.5 shrink-0"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          ) : (
+            <div className="p-2 bg-blue-600/10 rounded-lg border border-blue-500/20 text-blue-400 mt-0.5 shrink-0">
+              <Building className="w-5 h-5" />
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold text-white truncate" title={currentSchool?.schoolName}>
               {currentSchool?.schoolName || 'School Portal'}
@@ -247,6 +270,21 @@ const Sidebar = () => {
                   <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
                   <span>Subjects Management</span>
                 </NavLink>
+
+                {/* 5. School Profile */}
+                <NavLink
+                  to="/admin/school-profile"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Building className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>School Profile</span>
+                </NavLink>
               </div>
             )}
           </div>
@@ -322,6 +360,106 @@ const Sidebar = () => {
                 >
                   <Calendar className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
                   <span>Examination Management</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ADMIN ONLY: Student Management Expandable Menu (Module 4) */}
+        {currentUser?.roleCode === 'ADMIN' && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setStudentManagementOpen(!studentManagementOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                isInsideStudentManagement
+                  ? 'text-white bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center">
+                <UserPlus className="w-4 h-4 mr-3 text-emerald-400" />
+                <span>Student Management</span>
+              </div>
+              {studentManagementOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {studentManagementOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                <NavLink
+                  to="/admin/students"
+                  end
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Student Directory</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/students/admission"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <UserPlus className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Student Admission</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/students/enrollments"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Enrollment &amp; Transfers</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/students/promotion"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Student Promotion</span>
+                </NavLink>
+
+                <NavLink
+                  to="/admin/students/import"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Import Students</span>
                 </NavLink>
               </div>
             )}

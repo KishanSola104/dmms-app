@@ -38,6 +38,14 @@ export const SchoolAuthProvider = ({ children }) => {
     localStorage.setItem('dmms_school_info', JSON.stringify(schoolData));
   };
 
+  const updateSchoolData = (updatedSchool) => {
+    setCurrentSchool(prev => {
+      const merged = { ...prev, ...updatedSchool };
+      localStorage.setItem('dmms_school_info', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
   const logoutSchool = () => {
     setSchoolToken(null);
     setCurrentSchool(null);
@@ -62,6 +70,7 @@ export const SchoolAuthProvider = ({ children }) => {
         currentSchool,
         isSchoolAuthenticated,
         loginSchool,
+        updateSchoolData,
         logoutSchool,
         loading
       }}

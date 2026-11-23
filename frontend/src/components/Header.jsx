@@ -92,7 +92,16 @@ const Header = () => {
             {/* School identifier pill when in dashboard */}
             {showDashboardHeader && currentSchool && (
               <div className="hidden lg:flex items-center ml-4 pl-4 border-l border-slate-200 space-x-2">
-                <Building2 className="w-4 h-4 text-slate-400" />
+                {currentSchool.schoolLogoUrl ? (
+                  <img
+                    src={currentSchool.schoolLogoUrl}
+                    alt="Logo"
+                    className="w-5 h-5 rounded object-contain shrink-0"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <Building2 className="w-4 h-4 text-slate-400" />
+                )}
                 <span className="text-xs font-medium text-slate-600 truncate max-w-[200px]" title={currentSchool.schoolName}>
                   {currentSchool.schoolName}
                 </span>
