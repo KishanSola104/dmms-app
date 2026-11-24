@@ -43,13 +43,22 @@ const Sidebar = () => {
     location.pathname.startsWith('/admin/teacher-assignment') ||
     location.pathname.startsWith('/admin/examinations');
   const isInsideStudentManagement = location.pathname.startsWith('/admin/students');
-  const isInsideHeadTeacherAcademic = location.pathname.startsWith('/head-teacher');
+  const isInsideHeadTeacherAcademic =
+    location.pathname.startsWith('/head-teacher/classes') ||
+    location.pathname.startsWith('/head-teacher/subjects') ||
+    location.pathname.startsWith('/head-teacher/teachers') ||
+    location.pathname.startsWith('/head-teacher/teacher-assignments');
+  const isInsideHeadTeacherStudent =
+    location.pathname.startsWith('/head-teacher/students') ||
+    location.pathname.startsWith('/head-teacher/student-profile') ||
+    location.pathname.startsWith('/head-teacher/student-performance');
 
   const [adminSetupOpen, setAdminSetupOpen] = useState(true);
   const [classesSectionsOpen, setClassesSectionsOpen] = useState(true);
   const [academicManagementOpen, setAcademicManagementOpen] = useState(true);
   const [studentManagementOpen, setStudentManagementOpen] = useState(true);
   const [headTeacherAcademicOpen, setHeadTeacherAcademicOpen] = useState(true);
+  const [headTeacherStudentOpen, setHeadTeacherStudentOpen] = useState(true);
 
   // Auto-expand active branches if navigating
   useEffect(() => {
@@ -67,6 +76,9 @@ const Sidebar = () => {
     }
     if (isInsideHeadTeacherAcademic) {
       setHeadTeacherAcademicOpen(true);
+    }
+    if (isInsideHeadTeacherStudent) {
+      setHeadTeacherStudentOpen(true);
     }
   }, [location.pathname]);
 
@@ -234,6 +246,87 @@ const Sidebar = () => {
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
                   <span>Teacher Assignments</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* HEAD TEACHER ONLY: Module 2 Student Overview Expandable Menu */}
+        {currentUser?.roleCode === 'HEAD_TEACHER' && (
+          <div className="pt-2">
+            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Student Oversight
+            </div>
+
+            {/* Expandable Header */}
+            <button
+              type="button"
+              onClick={() => setHeadTeacherStudentOpen(!headTeacherStudentOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                isInsideHeadTeacherStudent
+                  ? 'text-white bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center">
+                <Users className="w-4 h-4 mr-3 text-cyan-400" />
+                <span>Student Overview</span>
+              </div>
+              {headTeacherStudentOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {/* Expandable Sub-items */}
+            {headTeacherStudentOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                {/* 1. Student List */}
+                <NavLink
+                  to="/head-teacher/students"
+                  end
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Student List</span>
+                </NavLink>
+
+                {/* 2. Student Profile */}
+                <NavLink
+                  to="/head-teacher/student-profile"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <UserCheck className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Student Profile</span>
+                </NavLink>
+
+                {/* 3. Student Performance */}
+                <NavLink
+                  to="/head-teacher/student-performance"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Student Performance</span>
                 </NavLink>
               </div>
             )}

@@ -6,6 +6,8 @@ import {
   BookOpen,
   GraduationCap,
   Users,
+  UserCheck,
+  TrendingUp,
   CheckCircle2,
   Clock,
   ArrowLeft,
@@ -53,12 +55,36 @@ const HeadTeacherPlaceholderPage = () => {
         color: 'emerald'
       };
     }
+    if (path.includes('/student-profile') || path.includes('/students/')) {
+      return {
+        phase: 'Phase 2 (Pending Approval)',
+        title: 'Student Profile Overview',
+        description: 'Comprehensive read-only student academic profile, personal details, and enrollment history.',
+        icon: UserCheck,
+        color: 'blue',
+        backPath: '/head-teacher/students',
+        backLabel: 'Go to Student List'
+      };
+    }
+    if (path.includes('/student-performance')) {
+      return {
+        phase: 'Phase 3 (Pending Approval)',
+        title: 'Student Academic Performance',
+        description: 'Read-only student examination results, subject-wise marks, and academic year progression.',
+        icon: TrendingUp,
+        color: 'indigo',
+        backPath: '/head-teacher/students',
+        backLabel: 'Go to Student List'
+      };
+    }
     return {
-      phase: 'Module 1',
-      title: 'Academic Overview',
+      phase: 'Module 2',
+      title: 'Student Overview',
       description: 'Supervisory and academic monitoring module for the Head Teacher.',
-      icon: Layers,
-      color: 'slate'
+      icon: Users,
+      color: 'slate',
+      backPath: '/head-teacher/students',
+      backLabel: 'Go to Student List'
     };
   };
 
@@ -91,18 +117,18 @@ const HeadTeacherPlaceholderPage = () => {
               <span>Development Stage Notice</span>
             </div>
             <p className="leading-relaxed">
-              In accordance with project development guidelines (Section 13), only the <strong>Head Teacher Dashboard</strong> is implemented in this stage.
-              This phase will be activated immediately following formal approval of the Dashboard.
+              In accordance with project development guidelines (Section 11), development follows a strict phase-by-phase approval process.
+              <strong> Phase 1 – Student List</strong> is currently active. This section will be implemented in subsequent phases following formal review.
             </p>
           </div>
 
           <div className="mt-8 flex justify-center space-x-3">
             <Link
-              to="/dashboard"
+              to={info.backPath || '/dashboard'}
               className="inline-flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              <span>Back to Head Teacher Dashboard</span>
+              <span>{info.backLabel || 'Back to Head Teacher Dashboard'}</span>
             </Link>
           </div>
         </div>

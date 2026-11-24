@@ -9,6 +9,11 @@ const SubjectTeacherAssignmentInfo = require('../models/subjectTeacherAssignment
 const ClassSubjectInfo = require('../models/classSubjectInfo.model');
 const UserInfo = require('../models/userInfo.model');
 const EmployeeInfo = require('../models/employeeInfo.model');
+const StudentEnrollmentHistoryInfo = require('../models/studentEnrollmentHistoryInfo.model');
+const ExaminationInfo = require('../models/examinationInfo.model');
+const ExaminationClassInfo = require('../models/examinationClassInfo.model');
+const ExaminationSubjectInfo = require('../models/examinationSubjectInfo.model');
+const ExaminationComponentInfo = require('../models/examinationComponentInfo.model');
 
 class HeadTeacherService {
   /**
@@ -1038,6 +1043,593 @@ class HeadTeacherService {
       subjectType: assignment.subjectRef?.subjectType || assignment.subjectType,
       assignmentStatus: assignment.status,
       createdAt: assignment.createdAt
+    };
+  }
+
+  // ==========================================
+  // MODULE 2 - STUDENT OVERVIEW: PHASE 1
+  // ==========================================
+
+  /**
+   * 4.1 - 4.5 List Students Enrolled in Selected Academic Year (Read-Only)
+   */
+  static async listStudents({
+    schoolId,
+    academicYearId,
+    classId,
+    sectionId,
+    gender,
+    enrollmentStatus,
+    search = '',
+    page = 1,
+    limit = 10
+  }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    // 1. Resolve Academic Year for the school
+    const { selectedYear } = await this.resolveAcademicYear(sId, academicYearId);
+    if (!selectedYear) {
+      return {
+        students: [],
+        selectedAcademicYear: null,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: 1,
+          totalRecords: 0,
+          limit: limitNum
+        }
+      };
+    }
+
+    const yearRef = selectedYear._id;
+
+    // 2. Build enrollment-level match (scoped strictly to school & selected academic year)
+    const matchEnrollment = {
+      schoolId: sId,
+      academicYearRef: new mongoose.Types.ObjectId(yearRef)
+    };
+
+    if (classId && classId !== 'ALL') {
+      if (mongoose.Types.ObjectId.isValid(classId)) {
+        matchEnrollment.classRef = new mongoose.Types.ObjectId(classId);
+      }
+    }
+
+    if (sectionId && sectionId !== 'ALL') {
+      if (mongoose.Types.ObjectId.isValid(sectionId)) {
+        matchEnrollment.sectionRef = new mongoose.Types.ObjectId(sectionId);
+      }
+    }
+
+    if (enrollmentStatus && enrollmentStatus !== 'ALL') {
+      matchEnrollment.status = enrollmentStatus.toUpperCase();
+    }
+
+    const pipeline = [
+      { $match: matchEnrollment },
+      {
+        $lookup: {
+          from: 'student_info',
+          localField: 'studentRef',
+          foreignField: '_id',
+          as: 'student'
+        }
+      },
+      { $unwind: '$student' },
+      {
+        $lookup: {
+          from: 'class_info',
+          localField: 'classRef',
+          foreignField: '_id',
+          as: 'class'
+        }
+      },
+      { $unwind: { path: '$class', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'section_info',
+          localField: 'sectionRef',
+          foreignField: '_id',
+          as: 'section'
+        }
+      },
+      { $unwind: { path: '$section', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'academic_year_info',
+          localField: 'academicYearRef',
+          foreignField: '_id',
+          as: 'academicYear'
+        }
+      },
+      { $unwind: { path: '$academicYear', preserveNullAndEmptyArrays: true } }
+    ];
+
+    // 3. Student-level filtering (schoolId, gender, search)
+    const studentMatch = {
+      'student.schoolId': sId
+    };
+
+    if (gender && gender !== 'ALL') {
+      studentMatch['student.gender'] = gender.toUpperCase();
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      const regex = new RegExp(term, 'i');
+      studentMatch.$or = [
+        { 'student.firstName': regex },
+        { 'student.lastName': regex },
+        { 'student.middleName': regex },
+        { 'student.admissionNumber': regex },
+        { rollNumber: regex },
+        {
+          $expr: {
+            $regexMatch: {
+              input: { $concat: ['$student.firstName', ' ', { $ifNull: ['$student.lastName', ''] }] },
+              regex: term,
+              options: 'i'
+            }
+          }
+        }
+      ];
+    }
+
+    pipeline.push({ $match: studentMatch });
+
+    // 4. Count total matching records
+    const countPipeline = [...pipeline, { $count: 'total' }];
+    const countResult = await StudentEnrollmentInfo.aggregate(countPipeline);
+    const totalRecords = countResult[0]?.total || 0;
+
+    // 5. Sort & Paginate
+    pipeline.push(
+      {
+        $sort: {
+          'class.className': 1,
+          'section.sectionName': 1,
+          rollNumber: 1,
+          'student.firstName': 1,
+          'student.lastName': 1
+        }
+      },
+      { $skip: skip },
+      { $limit: limitNum }
+    );
+
+    const records = await StudentEnrollmentInfo.aggregate(pipeline);
+
+    // 6. Format response data
+    const formattedStudents = records.map(r => {
+      const guardians = r.student.guardianDetails || [];
+      const fatherGuardian = guardians.find(g => (g.relationship || '').toUpperCase() === 'FATHER');
+      const motherGuardian = guardians.find(g => (g.relationship || '').toUpperCase() === 'MOTHER');
+      const primaryGuardian = guardians.find(g => g.isPrimaryContact) || fatherGuardian || motherGuardian || guardians[0] || null;
+
+      const fatherName = fatherGuardian?.fullName || '—';
+      const parentContactNumber = primaryGuardian?.mobileNumber || fatherGuardian?.mobileNumber || motherGuardian?.mobileNumber || r.student.contact?.phone || '—';
+
+      return {
+        _id: r.student._id,
+        studentId: r.student._id,
+        enrollmentId: r._id,
+        admissionNumber: r.student.admissionNumber,
+        firstName: r.student.firstName,
+        middleName: r.student.middleName || '',
+        lastName: r.student.lastName || '',
+        fullName: [r.student.firstName, r.student.middleName, r.student.lastName].filter(Boolean).join(' '),
+        gender: r.student.gender || 'UNAVAILABLE',
+        dateOfBirth: r.student.dateOfBirth,
+        profilePhotoUrl: r.student.profilePhotoUrl || '',
+        classId: r.classRef,
+        className: r.class?.className || 'N/A',
+        classCode: r.class?.classCode || '',
+        sectionId: r.sectionRef,
+        sectionName: r.section?.sectionName || 'N/A',
+        sectionCode: r.section?.sectionCode || '',
+        rollNumber: r.rollNumber || '',
+        fatherName,
+        parentContactNumber,
+        guardianName: primaryGuardian?.fullName || '—',
+        guardianRelationship: primaryGuardian?.relationship || '—',
+        enrollmentStatus: r.status || 'ACTIVE',
+        studentStatus: r.student.status || 'ACTIVE',
+        academicYearId: r.academicYearRef,
+        academicYearName: r.academicYear?.yearName || r.academicYear?.yearCode || 'N/A',
+        enrollmentDate: r.enrollmentDate
+      };
+    });
+
+    return {
+      students: formattedStudents,
+      selectedAcademicYear: selectedYear,
+      pagination: {
+        totalRecords,
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum) || 1,
+        limit: limitNum
+      }
+    };
+  }
+
+  // ==========================================
+  // MODULE 2 - STUDENT OVERVIEW: PHASE 2
+  // ==========================================
+
+  /**
+   * 5.1 - 5.6 Get Student Profile Overview (Read-Only)
+   */
+  static async getStudentProfile({ schoolId, studentId, academicYearId }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      const err = new Error('Valid student ID is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // 1. Fetch student master document strictly scoped to the school
+    const student = await StudentInfo.findOne({ _id: studentId, schoolId: sId })
+      .populate('admissionAcademicYearRef', 'yearName yearCode')
+      .populate('admissionClassRef', 'className classCode')
+      .lean();
+
+    if (!student) {
+      const err = new Error('Student record not found for this school.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // 2. Resolve target Academic Year
+    const { selectedYear, academicYears } = await this.resolveAcademicYear(sId, academicYearId);
+    const targetAyId = selectedYear ? selectedYear._id : null;
+
+    // 3. Find enrollment for the selected academic year
+    let currentEnrollment = null;
+    if (targetAyId) {
+      currentEnrollment = await StudentEnrollmentInfo.findOne({
+        schoolId: sId,
+        studentRef: student._id,
+        academicYearRef: targetAyId
+      })
+        .populate('academicYearRef', 'yearName yearCode isCurrent status')
+        .populate('classRef', 'className classCode classTeacherRef')
+        .populate('sectionRef', 'sectionName sectionCode sectionTeacherRef maxCapacity')
+        .lean();
+    }
+
+    // If no enrollment in target year, fall back to the most recent enrollment for context
+    if (!currentEnrollment) {
+      currentEnrollment = await StudentEnrollmentInfo.findOne({
+        schoolId: sId,
+        studentRef: student._id
+      })
+        .sort({ enrollmentDate: -1, createdAt: -1 })
+        .populate('academicYearRef', 'yearName yearCode isCurrent status')
+        .populate('classRef', 'className classCode classTeacherRef')
+        .populate('sectionRef', 'sectionName sectionCode sectionTeacherRef maxCapacity')
+        .lean();
+    }
+
+    // 4. Resolve Class Teacher and Section Teacher info
+    let classTeacher = null;
+    let sectionTeacher = null;
+
+    if (currentEnrollment?.classRef?.classTeacherRef) {
+      classTeacher = await EmployeeInfo.findById(currentEnrollment.classRef.classTeacherRef)
+        .select('fullName email mobileNumber designation')
+        .lean();
+    }
+    if (currentEnrollment?.sectionRef?.sectionTeacherRef) {
+      sectionTeacher = await EmployeeInfo.findById(currentEnrollment.sectionRef.sectionTeacherRef)
+        .select('fullName email mobileNumber designation')
+        .lean();
+    }
+
+    // 5. Parent / Guardian information extraction
+    const guardians = student.guardianDetails || [];
+    const fatherGuardian = guardians.find(g => (g.relationship || '').toUpperCase() === 'FATHER');
+    const motherGuardian = guardians.find(g => (g.relationship || '').toUpperCase() === 'MOTHER');
+    const otherGuardian = guardians.find(g => {
+      const rel = (g.relationship || '').toUpperCase();
+      return rel !== 'FATHER' && rel !== 'MOTHER';
+    });
+    const primaryGuardian = guardians.find(g => g.isPrimaryContact) || fatherGuardian || motherGuardian || otherGuardian || null;
+
+    // 6. Complete enrollment history across academic years
+    const allEnrollments = await StudentEnrollmentInfo.find({
+      schoolId: sId,
+      studentRef: student._id
+    })
+      .sort({ enrollmentDate: -1, createdAt: -1 })
+      .populate('academicYearRef', 'yearName yearCode isCurrent status')
+      .populate('classRef', 'className classCode')
+      .populate('sectionRef', 'sectionName sectionCode')
+      .lean();
+
+    // 7. Recorded status / section change timeline from StudentEnrollmentHistoryInfo
+    const enrollmentHistoryLogs = await StudentEnrollmentHistoryInfo.find({
+      schoolId: sId,
+      studentRef: student._id
+    })
+      .sort({ changedAt: -1, createdAt: -1 })
+      .populate('academicYearRef', 'yearName yearCode')
+      .populate('previousClassRef', 'className classCode')
+      .populate('previousSectionRef', 'sectionName sectionCode')
+      .populate('newClassRef', 'className classCode')
+      .populate('newSectionRef', 'sectionName sectionCode')
+      .lean();
+
+    // Format clean enrollment history table rows
+    const formattedEnrollmentHistory = allEnrollments.map(enr => ({
+      _id: enr._id,
+      academicYearName: enr.academicYearRef?.yearName || enr.academicYearRef?.yearCode || 'N/A',
+      academicYearId: enr.academicYearRef?._id,
+      isCurrentYear: !!enr.academicYearRef?.isCurrent,
+      className: enr.classRef?.className || 'N/A',
+      classCode: enr.classRef?.classCode || '',
+      sectionName: enr.sectionRef?.sectionName || 'N/A',
+      sectionCode: enr.sectionRef?.sectionCode || '',
+      rollNumber: enr.rollNumber || '—',
+      enrollmentDate: enr.enrollmentDate,
+      enrollmentStatus: enr.status || 'ACTIVE',
+      promotionOutcome: enr.promotionOutcome || null,
+      remarks: enr.remarks || '—'
+    }));
+
+    return {
+      student: {
+        _id: student._id,
+        admissionNumber: student.admissionNumber,
+        firstName: student.firstName,
+        middleName: student.middleName || '',
+        lastName: student.lastName || '',
+        fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+        dateOfBirth: student.dateOfBirth,
+        gender: student.gender || 'UNAVAILABLE',
+        profilePhotoUrl: student.profilePhotoUrl || '',
+        bloodGroup: student.bloodGroup || '—',
+        religion: student.religion || '—',
+        category: student.category || '—',
+        nationality: student.nationality || 'Indian',
+        studentMobile: student.contact?.phone || '—',
+        email: student.contact?.email || '—',
+        address: student.address || '—',
+        admissionDate: student.admissionDate,
+        admissionAcademicYear: student.admissionAcademicYearRef?.yearName || 'N/A',
+        admissionClass: student.admissionClassRef?.className || 'N/A',
+        masterStatus: student.status || 'ACTIVE'
+      },
+      academicPlacement: currentEnrollment ? {
+        enrollmentId: currentEnrollment._id,
+        academicYearId: currentEnrollment.academicYearRef?._id,
+        academicYearName: currentEnrollment.academicYearRef?.yearName || 'N/A',
+        isCurrentAcademicYear: !!currentEnrollment.academicYearRef?.isCurrent,
+        className: currentEnrollment.classRef?.className || 'N/A',
+        classCode: currentEnrollment.classRef?.classCode || '',
+        sectionName: currentEnrollment.sectionRef?.sectionName || 'N/A',
+        sectionCode: currentEnrollment.sectionRef?.sectionCode || '',
+        rollNumber: currentEnrollment.rollNumber || '—',
+        enrollmentDate: currentEnrollment.enrollmentDate,
+        enrollmentStatus: currentEnrollment.status || 'ACTIVE',
+        classTeacherName: classTeacher ? classTeacher.fullName : (currentEnrollment.classRef?.classTeacherName || 'Not Assigned'),
+        classTeacherEmail: classTeacher?.email || '—',
+        classTeacherMobile: classTeacher?.mobileNumber || '—',
+        sectionTeacherName: sectionTeacher ? sectionTeacher.fullName : 'Not Assigned',
+        sectionTeacherEmail: sectionTeacher?.email || '—',
+        sectionTeacherMobile: sectionTeacher?.mobileNumber || '—',
+        hasEnrollmentForSelectedYear: targetAyId ? (currentEnrollment.academicYearRef?._id?.toString() === targetAyId.toString()) : true
+      } : null,
+      parentGuardianInfo: {
+        father: {
+          fullName: fatherGuardian?.fullName || '—',
+          mobileNumber: fatherGuardian?.mobileNumber || '—',
+          email: fatherGuardian?.email || '—',
+          occupation: fatherGuardian?.occupation || student.fatherOccupation || '—'
+        },
+        mother: {
+          fullName: motherGuardian?.fullName || '—',
+          mobileNumber: motherGuardian?.mobileNumber || '—',
+          email: motherGuardian?.email || '—',
+          occupation: motherGuardian?.occupation || student.motherOccupation || '—'
+        },
+        guardian: otherGuardian ? {
+          fullName: otherGuardian.fullName,
+          relationship: otherGuardian.relationship || 'Guardian',
+          mobileNumber: otherGuardian.mobileNumber || '—',
+          email: otherGuardian.email || '—',
+          address: student.address || '—'
+        } : (primaryGuardian && primaryGuardian !== fatherGuardian && primaryGuardian !== motherGuardian ? {
+          fullName: primaryGuardian.fullName,
+          relationship: primaryGuardian.relationship || 'Guardian',
+          mobileNumber: primaryGuardian.mobileNumber || '—',
+          email: primaryGuardian.email || '—',
+          address: student.address || '—'
+        } : null)
+      },
+      enrollmentHistory: formattedEnrollmentHistory,
+      changeLogs: enrollmentHistoryLogs.map(log => ({
+        _id: log._id,
+        changeType: log.changeType,
+        academicYearName: log.academicYearRef?.yearName || 'N/A',
+        previousClass: log.previousClassRef?.className || null,
+        previousSection: log.previousSectionRef?.sectionName || null,
+        newClass: log.newClassRef?.className || 'N/A',
+        newSection: log.newSectionRef?.sectionName || 'N/A',
+        remarks: log.remarks || '—',
+        changedAt: log.changedAt || log.createdAt
+      })),
+      selectedAcademicYear: selectedYear,
+      allAcademicYears: academicYears
+    };
+  }
+
+  // ==========================================
+  // MODULE 2 - STUDENT OVERVIEW: PHASE 3
+  // ==========================================
+
+  /**
+   * 6.1 - 6.8 Get Student Performance Overview (Read-Only)
+   */
+  static async getStudentPerformance({ schoolId, studentId, academicYearId }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      const err = new Error('Valid student ID is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // 1. Verify student exists in this school
+    const student = await StudentInfo.findOne({ _id: studentId, schoolId: sId })
+      .select('firstName middleName lastName admissionNumber dateOfBirth gender profilePhotoUrl status')
+      .lean();
+
+    if (!student) {
+      const err = new Error('Student record not found for this school.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // 2. Fetch all enrollments for academic year selection & comparison
+    const allEnrollments = await StudentEnrollmentInfo.find({
+      schoolId: sId,
+      studentRef: student._id
+    })
+      .sort({ enrollmentDate: -1, createdAt: -1 })
+      .populate('academicYearRef', 'yearName yearCode isCurrent')
+      .populate('classRef', 'className classCode')
+      .populate('sectionRef', 'sectionName sectionCode')
+      .lean();
+
+    // 3. Resolve target academic year
+    const { selectedYear, academicYears } = await this.resolveAcademicYear(sId, academicYearId);
+    const targetAyId = selectedYear ? selectedYear._id : null;
+
+    // 4. Find enrollment for the selected academic year
+    const targetEnrollment = allEnrollments.find(e =>
+      e.academicYearRef && targetAyId && e.academicYearRef._id.toString() === targetAyId.toString()
+    ) || allEnrollments[0] || null;
+
+    // 5. Find configured examinations for the enrolled class and academic year
+    let examinations = [];
+    if (targetEnrollment && targetEnrollment.classRef) {
+      const examClasses = await ExaminationClassInfo.find({
+        schoolId: sId,
+        academicYearRef: targetEnrollment.academicYearRef._id,
+        classRef: targetEnrollment.classRef._id,
+        status: 'ACTIVE'
+      })
+        .populate('examinationRef')
+        .lean();
+
+      examinations = await Promise.all(examClasses.map(async (ec) => {
+        const exam = ec.examinationRef;
+        if (!exam) return null;
+
+        // Fetch subjects configured for this examination and class
+        const examSubjects = await ExaminationSubjectInfo.find({
+          schoolId: sId,
+          examinationRef: exam._id,
+          classRef: targetEnrollment.classRef._id,
+          status: 'ACTIVE'
+        })
+          .populate('subjectRef', 'subjectName subjectCode subjectType')
+          .lean();
+
+        // Fetch components for each subject
+        const subjectsWithComponents = await Promise.all(examSubjects.map(async (es) => {
+          const components = await ExaminationComponentInfo.find({
+            examinationSubjectRef: es._id,
+            schoolId: sId
+          })
+            .sort({ sequence: 1 })
+            .lean();
+
+          return {
+            _id: es._id,
+            subjectId: es.subjectRef?._id,
+            subjectName: es.subjectName || es.subjectRef?.subjectName,
+            subjectCode: es.subjectCode || es.subjectRef?.subjectCode,
+            subjectType: es.subjectType || es.subjectRef?.subjectType || 'ACADEMIC',
+            totalMaximumMarks: es.totalMaximumMarks || 0,
+            components: components.map(c => ({
+              _id: c._id,
+              componentName: c.componentName,
+              maximumMarks: c.maximumMarks,
+              sequence: c.sequence
+            }))
+          };
+        }));
+
+        return {
+          _id: exam._id,
+          examinationCode: exam.examinationCode,
+          examinationName: exam.examinationName,
+          status: exam.status,
+          startDate: exam.startDate,
+          endDate: exam.endDate,
+          className: targetEnrollment.classRef?.className,
+          sectionName: targetEnrollment.sectionRef?.sectionName,
+          totalSubjectsConfigured: subjectsWithComponents.length,
+          subjects: subjectsWithComponents,
+          hasApprovedResults: false,
+          approvedResultsStatus: 'NOT_PUBLISHED'
+        };
+      }));
+
+      examinations = examinations.filter(Boolean);
+    }
+
+    return {
+      student: {
+        _id: student._id,
+        admissionNumber: student.admissionNumber,
+        firstName: student.firstName,
+        middleName: student.middleName || '',
+        lastName: student.lastName || '',
+        fullName: [student.firstName, student.middleName, student.lastName].filter(Boolean).join(' '),
+        gender: student.gender,
+        dateOfBirth: student.dateOfBirth,
+        profilePhotoUrl: student.profilePhotoUrl
+      },
+      academicPlacement: targetEnrollment ? {
+        academicYearId: targetEnrollment.academicYearRef?._id,
+        academicYearName: targetEnrollment.academicYearRef?.yearName || 'N/A',
+        isCurrent: !!targetEnrollment.academicYearRef?.isCurrent,
+        className: targetEnrollment.classRef?.className || 'N/A',
+        classCode: targetEnrollment.classRef?.classCode || '',
+        sectionName: targetEnrollment.sectionRef?.sectionName || 'N/A',
+        sectionCode: targetEnrollment.sectionRef?.sectionCode || '',
+        rollNumber: targetEnrollment.rollNumber || '—',
+        enrollmentStatus: targetEnrollment.status
+      } : null,
+      availableAcademicYears: allEnrollments.map(e => ({
+        academicYearId: e.academicYearRef?._id,
+        academicYearName: e.academicYearRef?.yearName || 'N/A',
+        isCurrent: !!e.academicYearRef?.isCurrent,
+        className: e.classRef?.className || 'N/A',
+        sectionName: e.sectionRef?.sectionName || 'N/A'
+      })),
+      selectedAcademicYear: selectedYear,
+      totalExaminationsConfigured: examinations.length,
+      totalApprovedResults: 0,
+      hasApprovedResults: false,
+      examinations,
+      notice: 'Result publication module is not yet active. Only approved/published results will be displayed as final performance once results are published.'
     };
   }
 }

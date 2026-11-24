@@ -224,6 +224,84 @@ class HeadTeacherController {
       next(error);
     }
   }
+
+  // ==========================================
+  // MODULE 2: STUDENT OVERVIEW - PHASE 1
+  // ==========================================
+  static async listStudents(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const {
+        academicYearId,
+        classId,
+        sectionId,
+        gender,
+        enrollmentStatus,
+        status,
+        search,
+        page,
+        limit
+      } = req.query;
+
+      const data = await HeadTeacherService.listStudents({
+        schoolId,
+        academicYearId,
+        classId,
+        sectionId,
+        gender,
+        enrollmentStatus: enrollmentStatus || status,
+        search,
+        page,
+        limit
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================
+  // MODULE 2: STUDENT OVERVIEW - PHASE 2
+  // ==========================================
+  static async getStudentProfile(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const { studentId } = req.params;
+      const { academicYearId } = req.query;
+
+      const data = await HeadTeacherService.getStudentProfile({
+        schoolId,
+        studentId,
+        academicYearId
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================
+  // MODULE 2: STUDENT OVERVIEW - PHASE 3
+  // ==========================================
+  static async getStudentPerformance(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const { studentId } = req.params;
+      const { academicYearId } = req.query;
+
+      const data = await HeadTeacherService.getStudentPerformance({
+        schoolId,
+        studentId,
+        academicYearId
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = HeadTeacherController;

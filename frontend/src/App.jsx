@@ -46,6 +46,12 @@ import HeadTeacherClassesPage from './pages/headTeacher/HeadTeacherClassesPage';
 import HeadTeacherSubjectsPage from './pages/headTeacher/HeadTeacherSubjectsPage';
 import HeadTeacherTeachersPage from './pages/headTeacher/HeadTeacherTeachersPage';
 import HeadTeacherTeacherAssignmentsPage from './pages/headTeacher/HeadTeacherTeacherAssignmentsPage';
+import HeadTeacherPlaceholderPage from './pages/headTeacher/HeadTeacherPlaceholderPage';
+
+// Head Teacher Module 2 Pages
+import HeadTeacherStudentListPage from './pages/headTeacher/HeadTeacherStudentListPage';
+import HeadTeacherStudentProfilePage from './pages/headTeacher/HeadTeacherStudentProfilePage';
+import HeadTeacherStudentPerformancePage from './pages/headTeacher/HeadTeacherStudentPerformancePage';
 
 // Common 404 Page
 import NotFoundPage from './pages/NotFoundPage';
@@ -287,6 +293,48 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <HeadTeacherTeacherAssignmentsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Head Teacher Panel: Module 2 Student Overview Routes */}
+              <Route
+                path="/head-teacher/students"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherStudentListPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/students/:studentId"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherStudentProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/student-profile"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherStudentProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/students/:studentId/performance"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherStudentPerformancePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/student-performance"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherStudentPerformancePage />
                   </ProtectedRoute>
                 }
               />

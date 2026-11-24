@@ -37,4 +37,19 @@ router.get('/teachers/:teacherUserId', HeadTeacherController.getTeacherProfile);
 router.get('/teacher-assignments', HeadTeacherController.listTeacherAssignments);
 router.get('/teacher-assignments/:assignmentId', HeadTeacherController.getAssignmentDetails);
 
+// ==========================================
+// MODULE 2: STUDENT OVERVIEW - PHASE 1 (READ-ONLY)
+// ==========================================
+router.get('/students', HeadTeacherController.listStudents);
+
+// ==========================================
+// MODULE 2: STUDENT OVERVIEW - PHASE 2 (READ-ONLY)
+// ==========================================
+router.get('/students/:studentId', HeadTeacherController.getStudentProfile);
+
+// ==========================================
+// MODULE 2: STUDENT OVERVIEW - PHASE 3 (READ-ONLY)
+// ==========================================
+router.get('/students/:studentId/performance', HeadTeacherController.getStudentPerformance);
+
 module.exports = router;

@@ -26,7 +26,15 @@ const StatusBadge = ({ status, label }) => {
     case 'FINISHED':
     case 'COMPLETED':
       badgeClasses = 'bg-slate-100 text-slate-600 border-slate-300';
-      displayLabel = displayLabel || 'Past / Finished';
+      displayLabel = displayLabel || 'Completed';
+      break;
+    case 'TRANSFERRED':
+      badgeClasses = 'bg-purple-50 text-purple-700 border-purple-200';
+      displayLabel = displayLabel || 'Transferred';
+      break;
+    case 'WITHDRAWN':
+      badgeClasses = 'bg-amber-50 text-amber-700 border-amber-200';
+      displayLabel = displayLabel || 'Withdrawn';
       break;
     case 'ACADEMIC':
       badgeClasses = 'bg-indigo-50 text-indigo-700 border-indigo-200';
