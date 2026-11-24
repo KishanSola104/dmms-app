@@ -3,6 +3,7 @@ const NotificationInfo = require('../models/notificationInfo.model');
 const EmployeeInfo = require('../models/employeeInfo.model');
 const UserInfo = require('../models/userInfo.model');
 const SchoolInfo = require('../models/schoolInfo.model');
+const HeadTeacherService = require('../services/headTeacher.service');
 
 class CommonController {
   /**
@@ -184,20 +185,21 @@ class CommonController {
           ]
         };
       } else if (roleCode === 'HEAD_TEACHER') {
-        const teacherCount = await UserInfo.countDocuments({ schoolId, roleCode: 'TEACHER' });
+        const htData = await HeadTeacherService.getDashboardStats({
+          schoolId,
+          academicYearId: req.query.academicYearId || (activeAcademicYear ? activeAcademicYear._id : null)
+        });
         roleSpecificData = {
           roleTitle: 'Head Teacher Academic Portal',
           stats: [
-            { title: 'Faculty Teachers', value: teacherCount, icon: 'GraduationCap', color: 'purple' },
-            { title: 'Total School Staff', value: totalEmployees, icon: 'Users', color: 'blue' },
-            { title: 'Active Academic Session', value: activeAcademicYear ? activeAcademicYear.yearCode : 'N/A', icon: 'Calendar', color: 'emerald' },
-            { title: 'Pending Curricula Reviews', value: 0, icon: 'FileText', color: 'amber' }
+            { title: 'Total Students', value: htData.stats.totalStudents, icon: 'Users', color: 'blue' },
+            { title: 'Faculty Teachers', value: htData.stats.totalTeachers, icon: 'GraduationCap', color: 'purple' },
+            { title: 'Total Classes', value: htData.stats.totalClasses, icon: 'BookOpen', color: 'indigo' },
+            { title: 'Total Sections', value: htData.stats.totalSections, icon: 'Layers', color: 'emerald' },
+            { title: 'Total Subjects', value: htData.stats.totalSubjects, icon: 'FileText', color: 'amber' },
+            { title: 'Active Assignments', value: htData.stats.totalActiveTeacherAssignments, icon: 'CheckCircle', color: 'blue' }
           ],
-          academicHighlights: [
-            { label: 'Evaluation Period', value: 'First Term Examination 2026' },
-            { label: 'Syllabus Coverage', value: 'On Track (Sprint 1 In Progress)' },
-            { label: 'Supervised Grade Levels', value: 'Primary & Secondary Sections' }
-          ]
+          ...htData
         };
       } else if (roleCode === 'TEACHER') {
         roleSpecificData = {

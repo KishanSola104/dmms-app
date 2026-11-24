@@ -18,7 +18,8 @@ import {
   UserPlus,
   ArrowRightLeft,
   TrendingUp,
-  FileSpreadsheet
+  FileSpreadsheet,
+  CheckCircle2
 } from 'lucide-react';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
@@ -42,11 +43,13 @@ const Sidebar = () => {
     location.pathname.startsWith('/admin/teacher-assignment') ||
     location.pathname.startsWith('/admin/examinations');
   const isInsideStudentManagement = location.pathname.startsWith('/admin/students');
+  const isInsideHeadTeacherAcademic = location.pathname.startsWith('/head-teacher');
 
   const [adminSetupOpen, setAdminSetupOpen] = useState(true);
   const [classesSectionsOpen, setClassesSectionsOpen] = useState(true);
   const [academicManagementOpen, setAcademicManagementOpen] = useState(true);
   const [studentManagementOpen, setStudentManagementOpen] = useState(true);
+  const [headTeacherAcademicOpen, setHeadTeacherAcademicOpen] = useState(true);
 
   // Auto-expand active branches if navigating
   useEffect(() => {
@@ -61,6 +64,9 @@ const Sidebar = () => {
     }
     if (isInsideStudentManagement) {
       setStudentManagementOpen(true);
+    }
+    if (isInsideHeadTeacherAcademic) {
+      setHeadTeacherAcademicOpen(true);
     }
   }, [location.pathname]);
 
@@ -138,6 +144,101 @@ const Sidebar = () => {
           <LayoutDashboard className="w-4 h-4 mr-3" />
           <span>Dashboard</span>
         </NavLink>
+
+        {/* HEAD TEACHER ONLY: Module 1 Academic Overview Expandable Menu */}
+        {currentUser?.roleCode === 'HEAD_TEACHER' && (
+          <div className="pt-2">
+            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Academic Oversight
+            </div>
+
+            {/* Expandable Header */}
+            <button
+              type="button"
+              onClick={() => setHeadTeacherAcademicOpen(!headTeacherAcademicOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                isInsideHeadTeacherAcademic
+                  ? 'text-white bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center">
+                <GraduationCap className="w-4 h-4 mr-3 text-purple-400" />
+                <span>Academic Overview</span>
+              </div>
+              {headTeacherAcademicOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {/* Expandable Sub-items */}
+            {headTeacherAcademicOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                {/* 1. Classes & Sections */}
+                <NavLink
+                  to="/head-teacher/classes"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Layers className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Classes &amp; Sections</span>
+                </NavLink>
+
+                {/* 2. Subject Overview */}
+                <NavLink
+                  to="/head-teacher/subjects"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Subject Overview</span>
+                </NavLink>
+
+                {/* 3. Teacher Overview */}
+                <NavLink
+                  to="/head-teacher/teachers"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <GraduationCap className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Teacher Overview</span>
+                </NavLink>
+
+                {/* 4. Teacher Assignments */}
+                <NavLink
+                  to="/head-teacher/teacher-assignments"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Teacher Assignments</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ADMIN ONLY: Administrative Setup Expandable Menu */}
         {currentUser?.roleCode === 'ADMIN' && (

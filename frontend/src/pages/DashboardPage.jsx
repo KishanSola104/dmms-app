@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
+import HeadTeacherDashboard from '../components/headTeacher/HeadTeacherDashboard';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useAcademicYear } from '../context/AcademicYearContext';
@@ -29,6 +30,15 @@ const DashboardPage = () => {
   const { currentUser } = useUserAuth();
   const { currentSchool } = useSchoolAuth();
   const { selectedYear } = useAcademicYear();
+
+  // If authenticated user is HEAD_TEACHER, render dedicated Head Teacher Dashboard
+  if (currentUser?.roleCode === 'HEAD_TEACHER') {
+    return (
+      <DashboardLayout>
+        <HeadTeacherDashboard />
+      </DashboardLayout>
+    );
+  }
 
   const [statsData, setStatsData] = useState(null);
   const [loading, setLoading] = useState(true);

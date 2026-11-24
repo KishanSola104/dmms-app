@@ -41,6 +41,12 @@ import StudentPromotionPage from './pages/admin/StudentPromotionPage';
 import StudentImportPage from './pages/admin/StudentImportPage';
 import SchoolProfilePage from './pages/admin/SchoolProfilePage';
 
+// Head Teacher Module 1 Pages
+import HeadTeacherClassesPage from './pages/headTeacher/HeadTeacherClassesPage';
+import HeadTeacherSubjectsPage from './pages/headTeacher/HeadTeacherSubjectsPage';
+import HeadTeacherTeachersPage from './pages/headTeacher/HeadTeacherTeachersPage';
+import HeadTeacherTeacherAssignmentsPage from './pages/headTeacher/HeadTeacherTeacherAssignmentsPage';
+
 // Common 404 Page
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -248,6 +254,40 @@ function App() {
                   <AdminRoute>
                     <SchoolProfilePage />
                   </AdminRoute>
+                }
+              />
+
+              {/* Head Teacher Panel: Module 1 Academic Overview Routes */}
+              <Route
+                path="/head-teacher/classes"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherClassesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/subjects"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherSubjectsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/teachers"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherTeachersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/teacher-assignments"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherTeacherAssignmentsPage />
+                  </ProtectedRoute>
                 }
               />
 
