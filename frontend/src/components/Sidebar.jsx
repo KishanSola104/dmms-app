@@ -19,7 +19,17 @@ import {
   ArrowRightLeft,
   TrendingUp,
   FileSpreadsheet,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  Sliders,
+  BarChart3,
+  Edit3,
+  Send,
+  Award,
+  FileCheck2,
+  Sparkles,
+  ListChecks
 } from 'lucide-react';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
@@ -27,7 +37,7 @@ import { useSchoolAuth } from '../context/SchoolAuthContext';
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logoutUser } = useUserAuth();
+  const { currentUser, activePanel, logoutUser } = useUserAuth();
   const { currentSchool, logoutSchool } = useSchoolAuth();
 
   // Expandable sections state
@@ -52,6 +62,21 @@ const Sidebar = () => {
     location.pathname.startsWith('/head-teacher/students') ||
     location.pathname.startsWith('/head-teacher/student-profile') ||
     location.pathname.startsWith('/head-teacher/student-performance');
+  const isInsideHeadTeacherExamination =
+    location.pathname.startsWith('/head-teacher/examinations') ||
+    location.pathname.startsWith('/head-teacher/examination-schedule') ||
+    location.pathname.startsWith('/head-teacher/subject-configurations') ||
+    location.pathname.startsWith('/head-teacher/marks-entry-monitoring');
+  const isInsideTeacherMarks =
+    location.pathname.startsWith('/teacher/marks-entry') ||
+    location.pathname.startsWith('/teacher/submitted-marks') ||
+    location.pathname.startsWith('/teacher/extra-components') ||
+    location.pathname.startsWith('/teacher/co-curricular-grades');
+  const isInsideTeacherResults =
+    location.pathname.startsWith('/teacher/marks-verification') ||
+    location.pathname.startsWith('/teacher/examination-results') ||
+    location.pathname.startsWith('/teacher/final-result') ||
+    location.pathname.startsWith('/teacher/result-performance');
 
   const [adminSetupOpen, setAdminSetupOpen] = useState(true);
   const [classesSectionsOpen, setClassesSectionsOpen] = useState(true);
@@ -59,6 +84,21 @@ const Sidebar = () => {
   const [studentManagementOpen, setStudentManagementOpen] = useState(true);
   const [headTeacherAcademicOpen, setHeadTeacherAcademicOpen] = useState(true);
   const [headTeacherStudentOpen, setHeadTeacherStudentOpen] = useState(true);
+  const [headTeacherExaminationOpen, setHeadTeacherExaminationOpen] = useState(true);
+  const [teacherMarksOpen, setTeacherMarksOpen] = useState(true);
+  const [teacherResultsOpen, setTeacherResultsOpen] = useState(true);
+
+  const isDualAccessHT =
+    currentUser?.roleCode === 'HEAD_TEACHER' && !!currentUser?.teachingAccess?.hasTeachingAccess;
+  const effectivePanel = isDualAccessHT
+    ? activePanel === 'TEACHER' || location.pathname.startsWith('/teacher/')
+      ? 'TEACHER'
+      : 'HEAD_TEACHER'
+    : currentUser?.roleCode;
+  const hasTeacherPanelAccess =
+    effectivePanel === 'TEACHER' &&
+    (currentUser?.roleCode === 'TEACHER' || isDualAccessHT);
+  const isClassTeacher = !!currentUser?.teachingAccess?.hasClassTeacherAssignments;
 
   // Auto-expand active branches if navigating
   useEffect(() => {
@@ -79,6 +119,15 @@ const Sidebar = () => {
     }
     if (isInsideHeadTeacherStudent) {
       setHeadTeacherStudentOpen(true);
+    }
+    if (isInsideHeadTeacherExamination) {
+      setHeadTeacherExaminationOpen(true);
+    }
+    if (isInsideTeacherMarks) {
+      setTeacherMarksOpen(true);
+    }
+    if (isInsideTeacherResults) {
+      setTeacherResultsOpen(true);
     }
   }, [location.pathname]);
 
@@ -129,8 +178,12 @@ const Sidebar = () => {
             <p className="text-[11px] font-mono text-slate-400 mt-0.5">
               ID: {currentSchool?.schoolId}
             </p>
-            <span className={`inline-block mt-2 px-2 py-0.5 text-[10px] font-medium rounded border ${getRoleBadgeColor(currentUser?.roleCode)}`}>
-              {currentUser?.roleName || currentUser?.roleCode}
+            <span className={`inline-block mt-2 px-2 py-0.5 text-[10px] font-medium rounded border ${getRoleBadgeColor(effectivePanel || currentUser?.roleCode)}`}>
+              {isDualAccessHT
+                ? effectivePanel === 'TEACHER'
+                  ? 'Teacher Panel (Head Teacher)'
+                  : 'Head Teacher Panel'
+                : currentUser?.roleName || currentUser?.roleCode}
             </span>
           </div>
         </div>
@@ -158,7 +211,7 @@ const Sidebar = () => {
         </NavLink>
 
         {/* HEAD TEACHER ONLY: Module 1 Academic Overview Expandable Menu */}
-        {currentUser?.roleCode === 'HEAD_TEACHER' && (
+        {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2">
             <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
               Academic Oversight
@@ -253,7 +306,7 @@ const Sidebar = () => {
         )}
 
         {/* HEAD TEACHER ONLY: Module 2 Student Overview Expandable Menu */}
-        {currentUser?.roleCode === 'HEAD_TEACHER' && (
+        {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2">
             <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
               Student Oversight
@@ -330,6 +383,339 @@ const Sidebar = () => {
                 </NavLink>
               </div>
             )}
+          </div>
+        )}
+
+        {/* HEAD TEACHER ONLY: Module 4 Examination Management Expandable Menu */}
+        {effectivePanel === 'HEAD_TEACHER' && (
+          <div className="pt-2">
+            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Examination Oversight
+            </div>
+
+            {/* Expandable Header */}
+            <button
+              type="button"
+              onClick={() => setHeadTeacherExaminationOpen(!headTeacherExaminationOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                isInsideHeadTeacherExamination
+                  ? 'text-white bg-slate-800/80'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center">
+                <ClipboardList className="w-4 h-4 mr-3 text-amber-400" />
+                <span>Examination Management</span>
+              </div>
+              {headTeacherExaminationOpen ? (
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              )}
+            </button>
+
+            {/* Expandable Sub-items */}
+            {headTeacherExaminationOpen && (
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                {/* 1. Examination Overview */}
+                <NavLink
+                  to="/head-teacher/examinations"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <ClipboardList className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Examination Overview</span>
+                </NavLink>
+
+                {/* 2. Examination Schedule */}
+                <NavLink
+                  to="/head-teacher/examination-schedule"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Clock className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Examination Schedule</span>
+                </NavLink>
+
+                {/* 3. Subject Configuration Overview */}
+                <NavLink
+                  to="/head-teacher/subject-configurations"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <Sliders className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Subject Configuration Overview</span>
+                </NavLink>
+
+                {/* 4. Marks Entry Monitoring */}
+                <NavLink
+                  to="/head-teacher/marks-entry-monitoring"
+                  className={({ isActive }) =>
+                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`
+                  }
+                >
+                  <BarChart3 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <span>Marks Entry Monitoring</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* HEAD TEACHER ONLY: Result Approval & Publishing */}
+        {effectivePanel === 'HEAD_TEACHER' && (
+          <div className="pt-2 space-y-1">
+            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Result Approval &amp; Publishing
+            </div>
+            <NavLink
+              to="/head-teacher/result-approval"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Award className="w-4 h-4 mr-3 text-purple-400" />
+              <span>Result Review &amp; Publish</span>
+            </NavLink>
+          </div>
+        )}
+
+        {/* TEACHER PANEL ONLY (Completely separate from Head Teacher sidebar) */}
+        {hasTeacherPanelAccess && (
+          <div className="pt-2 space-y-1">
+            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Teaching &amp; Assessment
+            </div>
+
+            {/* 2. My Classes & Assignments */}
+            <NavLink
+              to="/teacher/my-classes"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Layers className="w-4 h-4 mr-3 text-emerald-400" />
+              <span>My Classes &amp; Assignments</span>
+            </NavLink>
+
+            {/* 3. Marks Management (Expandable) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setTeacherMarksOpen(!teacherMarksOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isInsideTeacherMarks
+                    ? 'text-white bg-slate-800/80'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Edit3 className="w-4 h-4 mr-3 text-emerald-400" />
+                  <span>Marks Management</span>
+                </div>
+                {teacherMarksOpen ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </button>
+
+              {teacherMarksOpen && (
+                <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                  <NavLink
+                    to="/teacher/marks-entry"
+                    className={({ isActive }) =>
+                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`
+                    }
+                  >
+                    <Edit3 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <span>Marks Entry</span>
+                  </NavLink>
+
+                  <NavLink
+                    to="/teacher/submitted-marks"
+                    className={({ isActive }) =>
+                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`
+                    }
+                  >
+                    <Send className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <span>Submitted Marks</span>
+                  </NavLink>
+
+                  <NavLink
+                    to="/teacher/extra-components"
+                    className={({ isActive }) =>
+                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`
+                    }
+                  >
+                    <Sliders className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <span>Extra Components</span>
+                  </NavLink>
+
+                  <NavLink
+                    to="/teacher/co-curricular-grades"
+                    className={({ isActive }) =>
+                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`
+                    }
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <span>Co-curricular Grades</span>
+                  </NavLink>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Class Result Management (Expandable) */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setTeacherResultsOpen(!teacherResultsOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isInsideTeacherResults
+                    ? 'text-white bg-slate-800/80'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <div className="flex items-center">
+                  <Award className="w-4 h-4 mr-3 text-teal-400" />
+                  <span>Class Result Management</span>
+                </div>
+                {teacherResultsOpen ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </button>
+
+              {teacherResultsOpen && (
+                <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                  {isClassTeacher && (
+                    <>
+                      <NavLink
+                        to="/teacher/marks-verification"
+                        className={({ isActive }) =>
+                          `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          }`
+                        }
+                      >
+                        <ListChecks className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                        <span>Marks Verification</span>
+                      </NavLink>
+
+                      <NavLink
+                        to="/teacher/examination-results"
+                        className={({ isActive }) =>
+                          `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          }`
+                        }
+                      >
+                        <FileCheck2 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                        <span>Examination Results</span>
+                      </NavLink>
+
+                      <NavLink
+                        to="/teacher/final-result"
+                        className={({ isActive }) =>
+                          `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                            isActive
+                              ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          }`
+                        }
+                      >
+                        <Award className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                        <span>Final Result</span>
+                      </NavLink>
+                    </>
+                  )}
+
+                  <NavLink
+                    to="/teacher/result-performance"
+                    className={({ isActive }) =>
+                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`
+                    }
+                  >
+                    <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <span>Result &amp; Performance</span>
+                  </NavLink>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* OFFICE STAFF ONLY: Published Results Portal */}
+        {effectivePanel === 'OFFICE_STAFF' && (
+          <div className="pt-2 space-y-1">
+            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Result Records
+            </div>
+            <NavLink
+              to="/office/published-results"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <FileCheck2 className="w-4 h-4 mr-3 text-amber-400" />
+              <span>Published Results</span>
+            </NavLink>
           </div>
         )}
 

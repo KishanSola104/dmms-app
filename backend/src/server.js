@@ -14,6 +14,8 @@ const profileRoutes = require('./routes/profile.routes');
 const commonRoutes = require('./routes/common.routes');
 const adminRoutes = require('./routes/admin.routes');
 const headTeacherRoutes = require('./routes/headTeacher.routes');
+const teacherRoutes = require('./routes/teacher.routes');
+const officeRoutes = require('./routes/office.routes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -52,6 +54,8 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/common', commonRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/head-teacher', headTeacherRoutes);
+app.use('/api/teacher', teacherRoutes);
+app.use('/api/office', officeRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

@@ -37,6 +37,10 @@ const employeeInfoSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  signatureUrl: {
+    type: String,
+    default: null
+  },
   address: {
     type: String,
     trim: true,

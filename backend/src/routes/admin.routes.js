@@ -148,5 +148,7 @@ router.get('/classes/:classId/sections/:sectionId/export/pdf', AdminStudentImpor
 router.get('/school-profile', AdminSchoolProfileController.getSchoolProfile);
 router.put('/school-profile', AdminSchoolProfileController.updateSchoolProfile);
 router.post('/school-profile/logo', logoUpload.single('logo'), AdminSchoolProfileController.uploadLogo);
+router.get('/result-config', AdminSchoolProfileController.getResultConfig);
+router.put('/result-config', AdminSchoolProfileController.updateResultConfig);
 
 module.exports = router;

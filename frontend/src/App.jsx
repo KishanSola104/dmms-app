@@ -53,6 +53,28 @@ import HeadTeacherStudentListPage from './pages/headTeacher/HeadTeacherStudentLi
 import HeadTeacherStudentProfilePage from './pages/headTeacher/HeadTeacherStudentProfilePage';
 import HeadTeacherStudentPerformancePage from './pages/headTeacher/HeadTeacherStudentPerformancePage';
 
+// Head Teacher Module 4 Examination Management Pages
+import HeadTeacherExaminationOverviewPage from './pages/headTeacher/HeadTeacherExaminationOverviewPage';
+import HeadTeacherExaminationSchedulePage from './pages/headTeacher/HeadTeacherExaminationSchedulePage';
+import HeadTeacherSubjectConfigPage from './pages/headTeacher/HeadTeacherSubjectConfigPage';
+import HeadTeacherMarksMonitoringPage from './pages/headTeacher/HeadTeacherMarksMonitoringPage';
+import HeadTeacherResultApprovalPage from './pages/headTeacher/HeadTeacherResultApprovalPage';
+
+// Office Staff Portal Pages
+import OfficePublishedResultsPage from './pages/office/OfficePublishedResultsPage';
+
+// Teacher Panel Pages
+import TeacherDashboardPage from './pages/teacher/TeacherDashboardPage';
+import TeacherMyClassesPage from './pages/teacher/TeacherMyClassesPage';
+import TeacherMarksEntryPage from './pages/teacher/TeacherMarksEntryPage';
+import TeacherSubmittedMarksPage from './pages/teacher/TeacherSubmittedMarksPage';
+import TeacherExtraComponentsPage from './pages/teacher/TeacherExtraComponentsPage';
+import TeacherCoCurricularGradesPage from './pages/teacher/TeacherCoCurricularGradesPage';
+import TeacherMarksVerificationPage from './pages/teacher/TeacherMarksVerificationPage';
+import TeacherExaminationResultsPage from './pages/teacher/TeacherExaminationResultsPage';
+import TeacherFinalResultPage from './pages/teacher/TeacherFinalResultPage';
+import TeacherResultPerformancePage from './pages/teacher/TeacherResultPerformancePage';
+
 // Common 404 Page
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -335,6 +357,140 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <HeadTeacherStudentPerformancePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Head Teacher Panel: Module 4 Examination Management Routes */}
+              <Route
+                path="/head-teacher/examinations"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherExaminationOverviewPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/examination-schedule"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherExaminationSchedulePage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/subject-configurations"
+                element={
+                  <ProtectedRoute>
+                    <HeadTeacherSubjectConfigPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/marks-entry-monitoring"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <HeadTeacherMarksMonitoringPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/result-approval"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <HeadTeacherResultApprovalPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Office Staff Portal Routes */}
+              <Route
+                path="/office/published-results"
+                element={
+                  <ProtectedRoute allowedRoles={['OFFICE_STAFF', 'ADMIN']}>
+                    <OfficePublishedResultsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Teacher Panel Routes (TEACHER & HEAD_TEACHER with teaching duties) */}
+              <Route
+                path="/teacher/dashboard"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherDashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/my-classes"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherMyClassesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/marks-entry"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherMarksEntryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/submitted-marks"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherSubmittedMarksPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/extra-components"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherExtraComponentsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/co-curricular-grades"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherCoCurricularGradesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/marks-verification"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherMarksVerificationPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/examination-results"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherExaminationResultsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/final-result"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherFinalResultPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher/result-performance"
+                element={
+                  <ProtectedRoute requireTeacherAccess>
+                    <TeacherResultPerformancePage />
                   </ProtectedRoute>
                 }
               />

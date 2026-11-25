@@ -46,12 +46,22 @@ const SchoolProfilePage = () => {
     contactPersons: []
   });
 
+  // Result & Grading Configuration State
+  const [resultConfig, setResultConfig] = useState(null);
+  const [savingConfig, setSavingConfig] = useState(false);
+
   // Fetch School Profile
   const fetchProfile = async () => {
     setLoading(true);
     setFeedback({ type: '', message: '' });
     try {
-      const res = await api.get('/admin/school-profile');
+      const [res, cfgRes] = await Promise.all([
+        api.get('/admin/school-profile'),
+        api.get('/admin/result-config')
+      ]);
+      if (cfgRes.success && cfgRes.config) {
+        setResultConfig(cfgRes.config);
+      }
       if (res.success && res.school) {
         const s = res.school;
         setFormData({
@@ -723,6 +733,487 @@ const SchoolProfilePage = () => {
               </button>
             </div>
           </form>
+        )}
+
+        {/* School Result & Grading Configuration Section */}
+        {!loading && resultConfig && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 gap-2">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  Result Calculation &amp; Grading Policy
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Configure academic final marks formula, passing criteria, co-curricular final workflow, and e-signature rendering (Config v{resultConfig.version}).
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 self-start">
+                Version {resultConfig.version}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Final Academic Formula</label>
+                <select
+                  value={resultConfig.academicFinalRule?.formulaType || 'SUM_DIVIDED_PLUS_ADDITIONAL'}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      academicFinalRule: { ...prev.academicFinalRule, formulaType: e.target.value }
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="SUM_DIVIDED_PLUS_ADDITIONAL">Sum of Terms / Divisor + Project</option>
+                  <option value="DIRECT_AVERAGE_PLUS_ADDITIONAL">Average of Terms + Project</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Term Sum Divisor</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={resultConfig.academicFinalRule?.termSumDivisor ?? 2}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      academicFinalRule: { ...prev.academicFinalRule, termSumDivisor: Number(e.target.value) }
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Expected Terms Count</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="6"
+                  value={resultConfig.academicFinalRule?.expectedExamCount ?? 3}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      academicFinalRule: { ...prev.academicFinalRule, expectedExamCount: Number(e.target.value) }
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Passing Percentage (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={resultConfig.passingRules?.passingPercentage ?? 40}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      passingRules: { ...prev.passingRules, passingPercentage: Number(e.target.value) }
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Co-Curricular Final Workflow</label>
+                <select
+                  value={resultConfig.coCurricularConfig?.finalWorkflow || 'AUTO_AVERAGE'}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      coCurricularConfig: { ...prev.coCurricularConfig, finalWorkflow: e.target.value }
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="AUTO_AVERAGE">Option A: System-Calculated Term Average</option>
+                  <option value="SEPARATE_SUBMISSION">Option B: Separate Final Grade Submission</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Rounding Mode</label>
+                <select
+                  value={resultConfig.academicFinalRule?.roundingMode || 'ROUND_HALF_UP'}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      academicFinalRule: { ...prev.academicFinalRule, roundingMode: e.target.value }
+                    }))
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white"
+                >
+                  <option value="ROUND_HALF_UP">Round Nearest Integer</option>
+                  <option value="FLOOR">Floor</option>
+                  <option value="CEIL">Ceiling</option>
+                  <option value="EXACT_TWO_DECIMALS">Exact (2 Decimals)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-5">
+                <input
+                  id="includeAdditional"
+                  type="checkbox"
+                  checked={resultConfig.academicFinalRule?.includeAdditionalComponents !== false}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      academicFinalRule: { ...prev.academicFinalRule, includeAdditionalComponents: e.target.checked }
+                    }))
+                  }
+                  className="rounded border-slate-300 text-blue-600"
+                />
+                <label htmlFor="includeAdditional" className="font-semibold text-slate-700">
+                  Include Project / Additional Marks
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-5">
+                <input
+                  id="useESign"
+                  type="checkbox"
+                  checked={resultConfig.useESignaturesOnMarksheet !== false}
+                  onChange={(e) =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      useESignaturesOnMarksheet: e.target.checked
+                    }))
+                  }
+                  className="rounded border-slate-300 text-blue-600"
+                />
+                <label htmlFor="useESign" className="font-semibold text-slate-700">
+                  Show E-Signatures on Marksheet
+                </label>
+              </div>
+            </div>
+
+            {/* Academic Grading Scale Table */}
+            <div className="border-t border-slate-100 pt-4 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Academic Grading Scale
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Define percentage bands for overall &amp; subject grades. Changes apply on next save and increment Policy Version.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResultConfig((prev) => ({
+                      ...prev,
+                      gradingScale: [
+                        ...(prev.gradingScale || []),
+                        {
+                          grade: '',
+                          minPercentage: 0,
+                          maxPercentage: 0,
+                          minInclusive: true,
+                          maxInclusive: false,
+                          isPassing: true,
+                          description: ''
+                        }
+                      ]
+                    }))
+                  }
+                  className="inline-flex items-center px-2.5 py-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg"
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Grade Band
+                </button>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+                      <th className="py-2 px-2.5">Grade</th>
+                      <th className="py-2 px-2.5">Min %</th>
+                      <th className="py-2 px-2.5">Max %</th>
+                      <th className="py-2 px-2.5 text-center">Min Incl.</th>
+                      <th className="py-2 px-2.5 text-center">Max Incl.</th>
+                      <th className="py-2 px-2.5 text-center">Passing</th>
+                      <th className="py-2 px-2.5">Description</th>
+                      <th className="py-2 px-2.5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(resultConfig.gradingScale || []).map((band, idx) => (
+                      <tr key={idx}>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="text"
+                            value={band.grade || ''}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], grade: e.target.value.toUpperCase() };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                            className="w-16 px-2 py-1 border border-slate-300 rounded font-bold uppercase"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={band.minPercentage ?? 0}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], minPercentage: Number(e.target.value) };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                            className="w-16 px-2 py-1 border border-slate-300 rounded"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={band.maxPercentage ?? 0}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], maxPercentage: Number(e.target.value) };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                            className="w-16 px-2 py-1 border border-slate-300 rounded"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={band.minInclusive !== false}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], minInclusive: e.target.checked };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={!!band.maxInclusive}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], maxInclusive: e.target.checked };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={band.isPassing !== false}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], isPassing: e.target.checked };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                          />
+                        </td>
+                        <td className="py-1.5 px-2">
+                          <input
+                            type="text"
+                            value={band.description || ''}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.gradingScale || [])];
+                              next[idx] = { ...next[idx], description: e.target.value };
+                              setResultConfig((prev) => ({ ...prev, gradingScale: next }));
+                            }}
+                            className="w-full min-w-[120px] px-2 py-1 border border-slate-300 rounded"
+                          />
+                        </td>
+                        <td className="py-1.5 px-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setResultConfig((prev) => ({
+                                ...prev,
+                                gradingScale: (prev.gradingScale || []).filter((_, i) => i !== idx)
+                              }))
+                            }
+                            className="p-1 text-rose-600 hover:bg-rose-50 rounded"
+                            title="Remove band"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Co-Curricular Grade Options & Rounding Rule */}
+            <div className="border-t border-slate-100 pt-4 space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Co-Curricular Grade Mapping &amp; Rounding
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Configure valid co-curricular grades, point weights used for Option A term averaging, and point rounding rule.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={resultConfig.coCurricularConfig?.roundingRule || 'ROUND_HALF_UP'}
+                    onChange={(e) =>
+                      setResultConfig((prev) => ({
+                        ...prev,
+                        coCurricularConfig: { ...prev.coCurricularConfig, roundingRule: e.target.value }
+                      }))
+                    }
+                    className="px-2.5 py-1 text-[11px] border border-slate-300 rounded-lg bg-white"
+                  >
+                    <option value="ROUND_HALF_UP">Point Rounding: Nearest</option>
+                    <option value="FLOOR">Point Rounding: Floor</option>
+                    <option value="CEIL">Point Rounding: Ceiling</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setResultConfig((prev) => ({
+                        ...prev,
+                        coCurricularConfig: {
+                          ...prev.coCurricularConfig,
+                          gradeOptions: [
+                            ...(prev.coCurricularConfig?.gradeOptions || []),
+                            { grade: '', points: 0, label: '' }
+                          ]
+                        }
+                      }))
+                    }
+                    className="inline-flex items-center px-2.5 py-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg"
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Co-Curricular Grade
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+                      <th className="py-2 px-3">Grade Code</th>
+                      <th className="py-2 px-3">Points</th>
+                      <th className="py-2 px-3">Label / Descriptor</th>
+                      <th className="py-2 px-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(resultConfig.coCurricularConfig?.gradeOptions || []).map((opt, idx) => (
+                      <tr key={idx}>
+                        <td className="py-1.5 px-3">
+                          <input
+                            type="text"
+                            value={opt.grade || ''}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.coCurricularConfig?.gradeOptions || [])];
+                              next[idx] = { ...next[idx], grade: e.target.value.toUpperCase() };
+                              setResultConfig((prev) => ({
+                                ...prev,
+                                coCurricularConfig: { ...prev.coCurricularConfig, gradeOptions: next }
+                              }));
+                            }}
+                            className="w-20 px-2 py-1 border border-slate-300 rounded font-bold uppercase"
+                          />
+                        </td>
+                        <td className="py-1.5 px-3">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={opt.points ?? 0}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.coCurricularConfig?.gradeOptions || [])];
+                              next[idx] = { ...next[idx], points: Number(e.target.value) };
+                              setResultConfig((prev) => ({
+                                ...prev,
+                                coCurricularConfig: { ...prev.coCurricularConfig, gradeOptions: next }
+                              }));
+                            }}
+                            className="w-20 px-2 py-1 border border-slate-300 rounded"
+                          />
+                        </td>
+                        <td className="py-1.5 px-3">
+                          <input
+                            type="text"
+                            value={opt.label || ''}
+                            onChange={(e) => {
+                              const next = [...(resultConfig.coCurricularConfig?.gradeOptions || [])];
+                              next[idx] = { ...next[idx], label: e.target.value };
+                              setResultConfig((prev) => ({
+                                ...prev,
+                                coCurricularConfig: { ...prev.coCurricularConfig, gradeOptions: next }
+                              }));
+                            }}
+                            className="w-full min-w-[140px] px-2 py-1 border border-slate-300 rounded"
+                          />
+                        </td>
+                        <td className="py-1.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setResultConfig((prev) => ({
+                                ...prev,
+                                coCurricularConfig: {
+                                  ...prev.coCurricularConfig,
+                                  gradeOptions: (prev.coCurricularConfig?.gradeOptions || []).filter((_, i) => i !== idx)
+                                }
+                              }))
+                            }
+                            className="p-1 text-rose-600 hover:bg-rose-50 rounded"
+                            title="Remove grade option"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                disabled={savingConfig}
+                onClick={async () => {
+                  setSavingConfig(true);
+                  setFeedback({ type: '', message: '' });
+                  try {
+                    const res = await api.put('/admin/result-config', resultConfig);
+                    if (res.success && res.config) {
+                      setResultConfig(res.config);
+                      setFeedback({ type: 'success', message: res.message });
+                    }
+                  } catch (err) {
+                    setFeedback({ type: 'error', message: err.message });
+                  } finally {
+                    setSavingConfig(false);
+                  }
+                }}
+                className="inline-flex items-center px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-xs"
+              >
+                {savingConfig ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                Save Result Policy
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </DashboardLayout>

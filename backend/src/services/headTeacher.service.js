@@ -1632,6 +1632,1623 @@ class HeadTeacherService {
       notice: 'Result publication module is not yet active. Only approved/published results will be displayed as final performance once results are published.'
     };
   }
+
+  // ==========================================
+  // MODULE 4 - EXAMINATION MANAGEMENT (HEAD TEACHER PANEL - READ ONLY)
+  // ==========================================
+
+  /**
+   * Helper: Resolve Academic Year scope supporting 'ALL' or specific academicYearId
+   */
+  static async resolveExaminationYearScope(schoolId, academicYearId) {
+    const sId = schoolId.toUpperCase();
+    const academicYears = await AcademicYearInfo.find({ schoolId: sId })
+      .sort({ isCurrent: -1, startDate: -1 })
+      .lean();
+
+    if (academicYearId === 'ALL') {
+      return { selectedYear: null, academicYears, isAllYears: true, invalidYear: false };
+    }
+
+    if (academicYearId) {
+      if (!mongoose.Types.ObjectId.isValid(academicYearId)) {
+        return { selectedYear: null, academicYears, isAllYears: false, invalidYear: true };
+      }
+      const matched = academicYears.find(y => y._id.toString() === academicYearId.toString());
+      if (!matched) {
+        return { selectedYear: null, academicYears, isAllYears: false, invalidYear: true };
+      }
+      return { selectedYear: matched, academicYears, isAllYears: false, invalidYear: false };
+    }
+
+    const defaultYear = academicYears.find(y => y.isCurrent) || academicYears[0] || null;
+    return { selectedYear: defaultYear, academicYears, isAllYears: false, invalidYear: false };
+  }
+
+  /**
+   * 4.1 Examination Overview (Summary Cards + Examination List + Filters)
+   */
+  static async listExaminations({
+    schoolId,
+    academicYearId,
+    examinationId = 'ALL',
+    classId = 'ALL',
+    status = 'ALL',
+    search = '',
+    page = 1,
+    limit = 10
+  }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const { selectedYear, academicYears, isAllYears, invalidYear } =
+      await this.resolveExaminationYearScope(sId, academicYearId);
+
+    const activeClasses = await ClassInfo.find({ schoolId: sId, status: 'ACTIVE' })
+      .sort({ className: 1 })
+      .select('_id classCode className')
+      .lean();
+
+    if (invalidYear || (!isAllYears && !selectedYear)) {
+      return {
+        selectedAcademicYear: null,
+        availableAcademicYears: academicYears,
+        summary: {
+          totalExaminations: 0,
+          upcomingExaminations: 0,
+          ongoingExaminations: 0,
+          completedExaminations: 0,
+          cancelledExaminations: 0
+        },
+        examinations: [],
+        filterOptions: { examinations: [], classes: activeClasses },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const baseScopeQuery = { schoolId: sId };
+    if (!isAllYears && selectedYear) {
+      baseScopeQuery.academicYearRef = selectedYear._id;
+    }
+
+    // Fetch all examinations in the selected Academic Year scope for accurate summary cards & filter options
+    const allScopeExams = await ExaminationInfo.find(baseScopeQuery)
+      .populate('academicYearRef', 'yearName yearCode isCurrent')
+      .sort({ startDate: -1, createdAt: -1 })
+      .lean();
+
+    const summary = {
+      totalExaminations: allScopeExams.length,
+      upcomingExaminations: allScopeExams.filter(e => e.status === 'UPCOMING').length,
+      ongoingExaminations: allScopeExams.filter(e => e.status === 'ONGOING').length,
+      completedExaminations: allScopeExams.filter(e => e.status === 'COMPLETED').length,
+      cancelledExaminations: allScopeExams.filter(e => e.status === 'CANCELLED').length
+    };
+
+    const filterExamOptions = allScopeExams.map(e => ({
+      _id: e._id,
+      examinationCode: e.examinationCode,
+      examinationName: e.examinationName,
+      status: e.status
+    }));
+
+    if (allScopeExams.length === 0) {
+      return {
+        selectedAcademicYear: selectedYear,
+        availableAcademicYears: academicYears,
+        summary,
+        examinations: [],
+        filterOptions: { examinations: filterExamOptions, classes: activeClasses },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const scopeExamIds = allScopeExams.map(e => e._id);
+
+    // Fetch assigned classes, configured subject counts, and enrollment counts efficiently
+    const [assignedClassDocs, subjectCountAgg, enrollmentAgg] = await Promise.all([
+      ExaminationClassInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      })
+        .sort({ className: 1 })
+        .lean(),
+      ExaminationSubjectInfo.aggregate([
+        { $match: { schoolId: sId, examinationRef: { $in: scopeExamIds }, status: 'ACTIVE' } },
+        { $group: { _id: '$examinationRef', count: { $sum: 1 } } }
+      ]),
+      StudentEnrollmentInfo.aggregate([
+        {
+          $match: {
+            schoolId: sId,
+            status: 'ACTIVE',
+            ...(!isAllYears && selectedYear ? { academicYearRef: selectedYear._id } : {})
+          }
+        },
+        {
+          $group: {
+            _id: { academicYearRef: '$academicYearRef', classRef: '$classRef' },
+            count: { $sum: 1 }
+          }
+        }
+      ])
+    ]);
+
+    const classMap = new Map();
+    for (const ac of assignedClassDocs) {
+      const key = ac.examinationRef.toString();
+      if (!classMap.has(key)) classMap.set(key, []);
+      classMap.get(key).push({
+        _id: ac._id,
+        classRef: ac.classRef,
+        classCode: ac.classCode,
+        className: ac.className
+      });
+    }
+
+    const subjectCountMap = new Map();
+    for (const item of subjectCountAgg) {
+      subjectCountMap.set(item._id.toString(), item.count);
+    }
+
+    const enrollmentCountMap = new Map();
+    for (const item of enrollmentAgg) {
+      if (item._id?.academicYearRef && item._id?.classRef) {
+        enrollmentCountMap.set(
+          `${item._id.academicYearRef.toString()}_${item._id.classRef.toString()}`,
+          item.count
+        );
+      }
+    }
+
+    let formatted = allScopeExams.map(exam => {
+      const eIdStr = exam._id.toString();
+      const ayIdStr = (exam.academicYearRef?._id || exam.academicYearRef)?.toString();
+      const assignedClasses = classMap.get(eIdStr) || [];
+
+      const enrolledStudentsCount = assignedClasses.reduce((sum, cls) => {
+        const key = `${ayIdStr}_${cls.classRef.toString()}`;
+        return sum + (enrollmentCountMap.get(key) || 0);
+      }, 0);
+
+      return {
+        _id: exam._id,
+        examinationCode: exam.examinationCode,
+        examinationName: exam.examinationName,
+        description: exam.description || '',
+        academicYearRef: exam.academicYearRef?._id || exam.academicYearRef,
+        academicYearName: exam.academicYearRef?.yearName || 'N/A',
+        academicYearCode: exam.academicYearRef?.yearCode || '',
+        startDate: exam.startDate,
+        endDate: exam.endDate,
+        hasIncompleteDates: !exam.startDate || !exam.endDate,
+        status: exam.status,
+        assignedClasses,
+        assignedClassCount: assignedClasses.length,
+        configuredSubjectsCount: subjectCountMap.get(eIdStr) || 0,
+        enrolledStudentsCount,
+        createdAt: exam.createdAt,
+        updatedAt: exam.updatedAt
+      };
+    });
+
+    // Apply filters
+    if (examinationId && examinationId !== 'ALL') {
+      formatted = formatted.filter(e => e._id.toString() === examinationId.toString());
+    }
+    if (status && status !== 'ALL') {
+      const cleanStatus = status.toUpperCase();
+      formatted = formatted.filter(e => e.status === cleanStatus);
+    }
+    if (classId && classId !== 'ALL') {
+      formatted = formatted.filter(e =>
+        e.assignedClasses.some(c => c.classRef.toString() === classId.toString())
+      );
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      formatted = formatted.filter(e =>
+        e.examinationName.toLowerCase().includes(q) ||
+        e.examinationCode.toLowerCase().includes(q) ||
+        (e.description && e.description.toLowerCase().includes(q)) ||
+        e.assignedClasses.some(c =>
+          c.className.toLowerCase().includes(q) || c.classCode.toLowerCase().includes(q)
+        )
+      );
+    }
+
+    const totalRecords = formatted.length;
+    const paginated = formatted.slice(skip, skip + limitNum);
+
+    return {
+      selectedAcademicYear: selectedYear,
+      availableAcademicYears: academicYears,
+      summary,
+      examinations: paginated,
+      filterOptions: {
+        examinations: filterExamOptions,
+        classes: activeClasses
+      },
+      pagination: {
+        totalRecords,
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum) || 1,
+        limit: limitNum
+      }
+    };
+  }
+
+  /**
+   * 4.2 Single Examination Details (Read-Only Modal/Drawer)
+   */
+  static async getExaminationDetails({ schoolId, examinationId }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+
+    if (!examinationId || !mongoose.Types.ObjectId.isValid(examinationId)) {
+      const err = new Error('Valid examination ID is required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const exam = await ExaminationInfo.findOne({ _id: examinationId, schoolId: sId })
+      .populate('academicYearRef', 'yearName yearCode isCurrent')
+      .lean();
+
+    if (!exam) {
+      const err = new Error('Examination record not found for your school.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const ayId = exam.academicYearRef?._id || exam.academicYearRef;
+
+    const assignedClassDocs = await ExaminationClassInfo.find({
+      schoolId: sId,
+      examinationRef: exam._id,
+      status: 'ACTIVE'
+    })
+      .sort({ className: 1 })
+      .lean();
+
+    const assignedClassIds = assignedClassDocs.map(c => c.classRef);
+
+    const [
+      examSubjects,
+      allocatedSubjects,
+      sections,
+      teacherAssignments,
+      enrollmentAgg
+    ] = await Promise.all([
+      ExaminationSubjectInfo.find({
+        schoolId: sId,
+        examinationRef: exam._id,
+        status: 'ACTIVE'
+      })
+        .sort({ subjectCode: 1 })
+        .lean(),
+      ClassSubjectInfo.find({
+        schoolId: sId,
+        academicYearRef: ayId,
+        classRef: { $in: assignedClassIds },
+        status: 'ACTIVE'
+      }).lean(),
+      SectionInfo.find({
+        schoolId: sId,
+        classRef: { $in: assignedClassIds },
+        status: 'ACTIVE'
+      })
+        .sort({ sectionName: 1 })
+        .lean(),
+      SubjectTeacherAssignmentInfo.find({
+        schoolId: sId,
+        academicYearRef: ayId,
+        classRef: { $in: assignedClassIds },
+        status: 'ACTIVE'
+      }).lean(),
+      StudentEnrollmentInfo.aggregate([
+        {
+          $match: {
+            schoolId: sId,
+            academicYearRef: ayId,
+            classRef: { $in: assignedClassIds },
+            status: 'ACTIVE'
+          }
+        },
+        {
+          $group: {
+            _id: { classRef: '$classRef', sectionRef: '$sectionRef' },
+            count: { $sum: 1 }
+          }
+        }
+      ])
+    ]);
+
+    const examSubjectIds = examSubjects.map(es => es._id);
+    const components = await ExaminationComponentInfo.find({
+      schoolId: sId,
+      examinationSubjectRef: { $in: examSubjectIds }
+    })
+      .sort({ sequence: 1 })
+      .lean();
+
+    const componentsByExamSubj = new Map();
+    for (const comp of components) {
+      const key = comp.examinationSubjectRef.toString();
+      if (!componentsByExamSubj.has(key)) componentsByExamSubj.set(key, []);
+      componentsByExamSubj.get(key).push({
+        _id: comp._id,
+        componentName: comp.componentName,
+        maximumMarks: comp.maximumMarks,
+        sequence: comp.sequence
+      });
+    }
+
+    const classNameMap = new Map();
+    for (const c of assignedClassDocs) {
+      classNameMap.set(c.classRef.toString(), { classCode: c.classCode, className: c.className });
+    }
+
+    const configuredSubjects = examSubjects.map(es => {
+      const cls = classNameMap.get(es.classRef.toString()) || {};
+      return {
+        _id: es._id,
+        classId: es.classRef,
+        classCode: cls.classCode || '',
+        className: cls.className || 'N/A',
+        subjectId: es.subjectRef,
+        subjectCode: es.subjectCode,
+        subjectName: es.subjectName,
+        subjectType: es.subjectType,
+        totalMaximumMarks: es.totalMaximumMarks,
+        passingMarks: null,
+        components: componentsByExamSubj.get(es._id.toString()) || [],
+        status: es.status
+      };
+    });
+
+    // Schedule derived from configured subjects & examination date window
+    const schedule = configuredSubjects.map(sub => ({
+      _id: sub._id,
+      classId: sub.classId,
+      classCode: sub.classCode,
+      className: sub.className,
+      subjectId: sub.subjectId,
+      subjectCode: sub.subjectCode,
+      subjectName: sub.subjectName,
+      startDate: exam.startDate,
+      endDate: exam.endDate,
+      startTime: null,
+      endTime: null,
+      totalMaximumMarks: sub.totalMaximumMarks
+    }));
+
+    // Build Marks Entry Progress summary (per class-section-subject using live enrollment & teacher assignment records)
+    const sectionByClassMap = new Map();
+    for (const sec of sections) {
+      const key = sec.classRef.toString();
+      if (!sectionByClassMap.has(key)) sectionByClassMap.set(key, []);
+      sectionByClassMap.get(key).push(sec);
+    }
+
+    const assignmentMap = new Map();
+    for (const a of teacherAssignments) {
+      assignmentMap.set(
+        `${a.classRef.toString()}_${a.sectionRef.toString()}_${a.subjectRef.toString()}`,
+        a
+      );
+    }
+
+    const sectionCountMap = new Map();
+    const classTotalCountMap = new Map();
+    for (const row of enrollmentAgg) {
+      const cKey = row._id.classRef.toString();
+      const sKey = row._id.sectionRef ? row._id.sectionRef.toString() : '';
+      classTotalCountMap.set(cKey, (classTotalCountMap.get(cKey) || 0) + row.count);
+      if (sKey) {
+        sectionCountMap.set(`${cKey}_${sKey}`, row.count);
+      }
+    }
+
+    const marksProgressRows = [];
+    for (const sub of configuredSubjects) {
+      const cId = sub.classId.toString();
+      const classSections = sectionByClassMap.get(cId) || [];
+      if (classSections.length > 0) {
+        for (const sec of classSections) {
+          const totalStudents = sectionCountMap.get(`${cId}_${sec._id.toString()}`) || 0;
+          const teacherAssign = assignmentMap.get(`${cId}_${sec._id.toString()}_${sub.subjectId.toString()}`);
+          const marksEntered = 0; // Marks-entry workflow not yet implemented in DMMS
+          const pending = totalStudents;
+          const progressPercentage = totalStudents > 0 ? Math.round((marksEntered / totalStudents) * 100) : 0;
+
+          marksProgressRows.push({
+            classId: sub.classId,
+            className: sub.className,
+            sectionId: sec._id,
+            sectionName: sec.sectionName,
+            subjectId: sub.subjectId,
+            subjectCode: sub.subjectCode,
+            subjectName: sub.subjectName,
+            assignedTeacherName: teacherAssign?.teacherName || null,
+            totalStudents,
+            marksEntered,
+            pending,
+            progressPercentage,
+            submissionStatus: 'PENDING'
+          });
+        }
+      } else {
+        const totalStudents = classTotalCountMap.get(cId) || 0;
+        marksProgressRows.push({
+          classId: sub.classId,
+          className: sub.className,
+          sectionId: null,
+          sectionName: null,
+          subjectId: sub.subjectId,
+          subjectCode: sub.subjectCode,
+          subjectName: sub.subjectName,
+          assignedTeacherName: null,
+          totalStudents,
+          marksEntered: 0,
+          pending: totalStudents,
+          progressPercentage: 0,
+          submissionStatus: 'PENDING'
+        });
+      }
+    }
+
+    const totalEligibleStudents = marksProgressRows.reduce((s, r) => s + r.totalStudents, 0);
+    const totalMarksEntered = marksProgressRows.reduce((s, r) => s + r.marksEntered, 0);
+    const overallProgressPercentage =
+      totalEligibleStudents > 0 ? Math.round((totalMarksEntered / totalEligibleStudents) * 100) : 0;
+
+    return {
+      examination: {
+        _id: exam._id,
+        examinationCode: exam.examinationCode,
+        examinationName: exam.examinationName,
+        description: exam.description || '',
+        academicYearRef: ayId,
+        academicYearName: exam.academicYearRef?.yearName || 'N/A',
+        academicYearCode: exam.academicYearRef?.yearCode || '',
+        startDate: exam.startDate,
+        endDate: exam.endDate,
+        hasIncompleteDates: !exam.startDate || !exam.endDate,
+        status: exam.status,
+        assignedClasses: assignedClassDocs.map(c => ({
+          _id: c._id,
+          classRef: c.classRef,
+          classCode: c.classCode,
+          className: c.className
+        }))
+      },
+      configuredSubjects,
+      classAllocationSummary: {
+        totalAllocatedInClasses: allocatedSubjects.length,
+        totalConfiguredInExam: configuredSubjects.length
+      },
+      schedule,
+      marksEntryProgress: {
+        isMarksModuleActive: false,
+        totalEntries: marksProgressRows.length,
+        totalEligibleStudents,
+        totalMarksEntered,
+        totalPending: totalEligibleStudents - totalMarksEntered,
+        overallProgressPercentage,
+        rows: marksProgressRows
+      }
+    };
+  }
+
+  /**
+   * 4.3 Examination Schedule (Read-Only Timetable + Conflict & Same-Date Detection)
+   */
+  static async getExaminationSchedule({
+    schoolId,
+    academicYearId,
+    examinationId = 'ALL',
+    classId = 'ALL',
+    subjectId = 'ALL',
+    dateFrom = '',
+    dateTo = '',
+    search = '',
+    page = 1,
+    limit = 10
+  }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const { selectedYear, academicYears, isAllYears, invalidYear } =
+      await this.resolveExaminationYearScope(sId, academicYearId);
+
+    const [activeClasses, activeSubjects] = await Promise.all([
+      ClassInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ className: 1 }).select('_id classCode className').lean(),
+      SubjectInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ subjectName: 1 }).select('_id subjectCode subjectName subjectType').lean()
+    ]);
+
+    if (invalidYear || (!isAllYears && !selectedYear)) {
+      return {
+        selectedAcademicYear: null,
+        availableAcademicYears: academicYears,
+        schedule: [],
+        conflicts: [],
+        sameDateExaminations: [],
+        summary: { totalEntries: 0, uniqueExaminations: 0, missingDatesCount: 0, conflictCount: 0 },
+        filterOptions: { examinations: [], classes: activeClasses, subjects: activeSubjects },
+        scheduleSchemaInfo: {
+          hasSubjectLevelTimetable: false,
+          note: 'Subject-level paper dates and start/end times are not configured in the current Admin Examination schema; displaying examination window dates.'
+        },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const examQuery = { schoolId: sId };
+    if (!isAllYears && selectedYear) {
+      examQuery.academicYearRef = selectedYear._id;
+    }
+
+    const scopeExams = await ExaminationInfo.find(examQuery)
+      .populate('academicYearRef', 'yearName yearCode')
+      .sort({ startDate: 1, examinationName: 1 })
+      .lean();
+
+    const examMap = new Map();
+    for (const ex of scopeExams) {
+      examMap.set(ex._id.toString(), ex);
+    }
+
+    const scopeExamIds = scopeExams.map(e => e._id);
+    const [examClassDocs, examSubjectDocs] = await Promise.all([
+      ExaminationClassInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      }).lean(),
+      ExaminationSubjectInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      })
+        .sort({ subjectCode: 1 })
+        .lean()
+    ]);
+
+    const classInfoMap = new Map();
+    for (const c of activeClasses) {
+      classInfoMap.set(c._id.toString(), c);
+    }
+
+    // Conflict Detection (Read-Only):
+    // 1. Multiple non-cancelled examinations assigned to the same class with overlapping dates
+    const conflicts = [];
+    const examsByClass = new Map();
+    for (const ec of examClassDocs) {
+      const ex = examMap.get(ec.examinationRef.toString());
+      if (!ex || ex.status === 'CANCELLED') continue;
+      const cKey = ec.classRef.toString();
+      if (!examsByClass.has(cKey)) examsByClass.set(cKey, []);
+      examsByClass.get(cKey).push({ exam: ex, className: ec.className, classCode: ec.classCode });
+    }
+
+    for (const [cId, items] of examsByClass.entries()) {
+      for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+          const exA = items[i].exam;
+          const exB = items[j].exam;
+          if (!exA.startDate || !exB.startDate) continue;
+
+          const startA = new Date(exA.startDate);
+          const endA = exA.endDate ? new Date(exA.endDate) : new Date(exA.startDate);
+          const startB = new Date(exB.startDate);
+          const endB = exB.endDate ? new Date(exB.endDate) : new Date(exB.startDate);
+
+          startA.setHours(0, 0, 0, 0);
+          endA.setHours(23, 59, 59, 999);
+          startB.setHours(0, 0, 0, 0);
+          endB.setHours(23, 59, 59, 999);
+
+          if (startA <= endB && startB <= endA) {
+            conflicts.push({
+              type: 'CLASS_DATE_OVERLAP',
+              classId: cId,
+              className: items[i].className,
+              examinations: [
+                { _id: exA._id, examinationCode: exA.examinationCode, examinationName: exA.examinationName, startDate: exA.startDate, endDate: exA.endDate },
+                { _id: exB._id, examinationCode: exB.examinationCode, examinationName: exB.examinationName, startDate: exB.startDate, endDate: exB.endDate }
+              ],
+              message: `Overlapping examination dates detected for ${items[i].className}: "${exA.examinationName}" and "${exB.examinationName}".`
+            });
+          }
+        }
+      }
+    }
+
+    // 2. Duplicate schedule entries for same (examination, class, subject)
+    const seenExamClassSubj = new Set();
+    for (const es of examSubjectDocs) {
+      const dupKey = `${es.examinationRef.toString()}_${es.classRef.toString()}_${es.subjectRef.toString()}`;
+      if (seenExamClassSubj.has(dupKey)) {
+        const ex = examMap.get(es.examinationRef.toString());
+        const cls = classInfoMap.get(es.classRef.toString());
+        conflicts.push({
+          type: 'DUPLICATE_SUBJECT_ENTRY',
+          classId: es.classRef.toString(),
+          className: cls?.className || '',
+          subjectName: es.subjectName,
+          message: `Duplicate schedule entry for ${cls?.className || 'Class'} - ${es.subjectName} in "${ex?.examinationName || 'Examination'}".`
+        });
+      }
+      seenExamClassSubj.add(dupKey);
+    }
+
+    // 3. Identify examinations scheduled on the same start date
+    const examsByStartDate = new Map();
+    for (const ex of scopeExams) {
+      if (!ex.startDate || ex.status === 'CANCELLED') continue;
+      const dKey = new Date(ex.startDate).toISOString().split('T')[0];
+      if (!examsByStartDate.has(dKey)) examsByStartDate.set(dKey, []);
+      examsByStartDate.get(dKey).push({
+        _id: ex._id,
+        examinationCode: ex.examinationCode,
+        examinationName: ex.examinationName
+      });
+    }
+    const sameDateExaminations = Array.from(examsByStartDate.entries())
+      .filter(([, list]) => list.length > 1)
+      .map(([date, list]) => ({ date, examinations: list }));
+
+    // Build schedule entries from ExaminationSubjectInfo
+    const examClassLookup = new Map();
+    for (const ec of examClassDocs) {
+      examClassLookup.set(`${ec.examinationRef.toString()}_${ec.classRef.toString()}`, ec);
+    }
+
+    let rows = examSubjectDocs
+      .map(es => {
+        const ex = examMap.get(es.examinationRef.toString());
+        if (!ex) return null;
+        const ec = examClassLookup.get(`${es.examinationRef.toString()}_${es.classRef.toString()}`);
+        const cls = classInfoMap.get(es.classRef.toString());
+        const className = ec?.className || cls?.className || 'N/A';
+        const classCode = ec?.classCode || cls?.classCode || '';
+
+        const startDateKey = ex.startDate ? new Date(ex.startDate).toISOString().split('T')[0] : null;
+        const isSameDateShared = startDateKey ? (examsByStartDate.get(startDateKey)?.length || 0) > 1 : false;
+
+        return {
+          _id: es._id,
+          examinationId: ex._id,
+          examinationCode: ex.examinationCode,
+          examinationName: ex.examinationName,
+          examinationStatus: ex.status,
+          academicYearRef: ex.academicYearRef?._id || ex.academicYearRef,
+          academicYearName: ex.academicYearRef?.yearName || 'N/A',
+          classId: es.classRef,
+          classCode,
+          className,
+          subjectId: es.subjectRef,
+          subjectCode: es.subjectCode,
+          subjectName: es.subjectName,
+          subjectType: es.subjectType,
+          startDate: ex.startDate,
+          endDate: ex.endDate,
+          examinationDate: ex.startDate,
+          startTime: null,
+          endTime: null,
+          totalMaximumMarks: es.totalMaximumMarks,
+          hasIncompleteDates: !ex.startDate || !ex.endDate,
+          isSameDateShared
+        };
+      })
+      .filter(Boolean);
+
+    // Apply filters
+    if (examinationId && examinationId !== 'ALL') {
+      rows = rows.filter(r => r.examinationId.toString() === examinationId.toString());
+    }
+    if (classId && classId !== 'ALL') {
+      rows = rows.filter(r => r.classId.toString() === classId.toString());
+    }
+    if (subjectId && subjectId !== 'ALL') {
+      rows = rows.filter(r => r.subjectId.toString() === subjectId.toString());
+    }
+    if (dateFrom || dateTo) {
+      const fromDt = dateFrom ? new Date(dateFrom) : null;
+      const toDt = dateTo ? new Date(dateTo) : null;
+      if (fromDt && !isNaN(fromDt.getTime())) fromDt.setHours(0, 0, 0, 0);
+      if (toDt && !isNaN(toDt.getTime())) toDt.setHours(23, 59, 59, 999);
+
+      rows = rows.filter(r => {
+        if (!r.startDate && !r.endDate) return false;
+        const exStart = new Date(r.startDate || r.endDate);
+        const exEnd = new Date(r.endDate || r.startDate);
+        exStart.setHours(0, 0, 0, 0);
+        exEnd.setHours(23, 59, 59, 999);
+        if (fromDt && !isNaN(fromDt.getTime()) && exEnd < fromDt) return false;
+        if (toDt && !isNaN(toDt.getTime()) && exStart > toDt) return false;
+        return true;
+      });
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      rows = rows.filter(r =>
+        r.examinationName.toLowerCase().includes(q) ||
+        r.examinationCode.toLowerCase().includes(q) ||
+        r.className.toLowerCase().includes(q) ||
+        r.subjectName.toLowerCase().includes(q) ||
+        r.subjectCode.toLowerCase().includes(q)
+      );
+    }
+
+    rows.sort((a, b) => {
+      const da = a.startDate ? new Date(a.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+      const db = b.startDate ? new Date(b.startDate).getTime() : Number.MAX_SAFE_INTEGER;
+      if (da !== db) return da - db;
+      const clsCmp = a.className.localeCompare(b.className);
+      if (clsCmp !== 0) return clsCmp;
+      return a.subjectName.localeCompare(b.subjectName);
+    });
+
+    const uniqueExamIds = new Set(rows.map(r => r.examinationId.toString()));
+    const missingDatesCount = rows.filter(r => r.hasIncompleteDates).length;
+
+    const totalRecords = rows.length;
+    const paginated = rows.slice(skip, skip + limitNum);
+
+    return {
+      selectedAcademicYear: selectedYear,
+      availableAcademicYears: academicYears,
+      schedule: paginated,
+      conflicts,
+      sameDateExaminations,
+      summary: {
+        totalEntries: totalRecords,
+        uniqueExaminations: uniqueExamIds.size,
+        missingDatesCount,
+        conflictCount: conflicts.length
+      },
+      filterOptions: {
+        examinations: scopeExams.map(e => ({
+          _id: e._id,
+          examinationCode: e.examinationCode,
+          examinationName: e.examinationName,
+          status: e.status
+        })),
+        classes: activeClasses,
+        subjects: activeSubjects
+      },
+      scheduleSchemaInfo: {
+        hasSubjectLevelTimetable: false,
+        note: 'Subject-level paper dates and start/end times are not configured in the current Admin Examination schema; displaying examination window dates.'
+      },
+      pagination: {
+        totalRecords,
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum) || 1,
+        limit: limitNum
+      }
+    };
+  }
+
+  /**
+   * 4.4 Subject Configuration Overview (Read-Only)
+   */
+  static async getSubjectConfigurations({
+    schoolId,
+    academicYearId,
+    examinationId = 'ALL',
+    classId = 'ALL',
+    subjectId = 'ALL',
+    configStatus = 'ALL',
+    search = '',
+    page = 1,
+    limit = 10
+  }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const { selectedYear, academicYears, isAllYears, invalidYear } =
+      await this.resolveExaminationYearScope(sId, academicYearId);
+
+    const [activeClasses, activeSubjects] = await Promise.all([
+      ClassInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ className: 1 }).select('_id classCode className').lean(),
+      SubjectInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ subjectName: 1 }).select('_id subjectCode subjectName subjectType').lean()
+    ]);
+
+    if (invalidYear || (!isAllYears && !selectedYear)) {
+      return {
+        selectedAcademicYear: null,
+        availableAcademicYears: academicYears,
+        configurations: [],
+        summary: { totalRecords: 0, configuredCount: 0, unconfiguredCount: 0, zeroMarksConfiguredCount: 0 },
+        filterOptions: { examinations: [], classes: activeClasses, subjects: activeSubjects },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const examQuery = { schoolId: sId };
+    if (!isAllYears && selectedYear) {
+      examQuery.academicYearRef = selectedYear._id;
+    }
+
+    const scopeExams = await ExaminationInfo.find(examQuery)
+      .populate('academicYearRef', 'yearName yearCode')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const scopeExamIds = scopeExams.map(e => e._id);
+    if (scopeExamIds.length === 0) {
+      return {
+        selectedAcademicYear: selectedYear,
+        availableAcademicYears: academicYears,
+        configurations: [],
+        summary: { totalRecords: 0, configuredCount: 0, unconfiguredCount: 0, zeroMarksConfiguredCount: 0 },
+        filterOptions: { examinations: [], classes: activeClasses, subjects: activeSubjects },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const [examClassDocs, examSubjectDocs, classSubjectDocs] = await Promise.all([
+      ExaminationClassInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      })
+        .sort({ className: 1 })
+        .lean(),
+      ExaminationSubjectInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      }).lean(),
+      ClassSubjectInfo.find({
+        schoolId: sId,
+        ...(!isAllYears && selectedYear ? { academicYearRef: selectedYear._id } : {}),
+        status: 'ACTIVE'
+      })
+        .sort({ subjectCode: 1 })
+        .lean()
+    ]);
+
+    const examSubjectIds = examSubjectDocs.map(es => es._id);
+    const componentDocs = await ExaminationComponentInfo.find({
+      schoolId: sId,
+      examinationSubjectRef: { $in: examSubjectIds }
+    })
+      .sort({ sequence: 1 })
+      .lean();
+
+    const compMap = new Map();
+    for (const c of componentDocs) {
+      const k = c.examinationSubjectRef.toString();
+      if (!compMap.has(k)) compMap.set(k, []);
+      compMap.get(k).push({
+        _id: c._id,
+        componentName: c.componentName,
+        maximumMarks: c.maximumMarks,
+        sequence: c.sequence
+      });
+    }
+
+    const examMap = new Map();
+    for (const ex of scopeExams) {
+      examMap.set(ex._id.toString(), ex);
+    }
+
+    const examSubjectMap = new Map();
+    for (const es of examSubjectDocs) {
+      examSubjectMap.set(
+        `${es.examinationRef.toString()}_${es.classRef.toString()}_${es.subjectRef.toString()}`,
+        es
+      );
+    }
+
+    const classSubjByYearClassMap = new Map();
+    for (const cs of classSubjectDocs) {
+      const key = `${cs.academicYearRef.toString()}_${cs.classRef.toString()}`;
+      if (!classSubjByYearClassMap.has(key)) classSubjByYearClassMap.set(key, []);
+      classSubjByYearClassMap.get(key).push(cs);
+    }
+
+    const classInfoMap = new Map();
+    for (const c of activeClasses) {
+      classInfoMap.set(c._id.toString(), c);
+    }
+
+    const mergedRows = [];
+    const includedKeys = new Set();
+
+    // Merge assigned classes with allocated ClassSubjectInfo + ExaminationSubjectInfo
+    for (const ec of examClassDocs) {
+      const ex = examMap.get(ec.examinationRef.toString());
+      if (!ex) continue;
+      const ayId = (ex.academicYearRef?._id || ex.academicYearRef).toString();
+      const allocatedList = classSubjByYearClassMap.get(`${ayId}_${ec.classRef.toString()}`) || [];
+
+      for (const alloc of allocatedList) {
+        const key = `${ex._id.toString()}_${ec.classRef.toString()}_${alloc.subjectRef.toString()}`;
+        includedKeys.add(key);
+        const es = examSubjectMap.get(key);
+        const components = es ? (compMap.get(es._id.toString()) || []) : [];
+
+        mergedRows.push({
+          _id: es ? es._id : `${ex._id}_${ec.classRef}_${alloc.subjectRef}`,
+          examinationSubjectId: es ? es._id : null,
+          examinationId: ex._id,
+          examinationCode: ex.examinationCode,
+          examinationName: ex.examinationName,
+          examinationStatus: ex.status,
+          academicYearRef: ayId,
+          academicYearName: ex.academicYearRef?.yearName || 'N/A',
+          classId: ec.classRef,
+          classCode: ec.classCode,
+          className: ec.className,
+          subjectId: alloc.subjectRef,
+          subjectCode: alloc.subjectCode,
+          subjectName: alloc.subjectName,
+          subjectType: alloc.subjectType,
+          totalMaximumMarks: es ? es.totalMaximumMarks : 0,
+          passingMarks: null, // Not present in current DMMS ExaminationSubjectInfo schema
+          assessmentType: es
+            ? (components.length > 0
+                ? `${es.subjectType === 'CO_CURRICULAR' ? 'Co-Curricular' : 'Academic'} (${components.map(c => c.componentName).join(', ')})`
+                : `${es.subjectType === 'CO_CURRICULAR' ? 'Co-Curricular' : 'Academic'} (No Components)`)
+            : (alloc.subjectType === 'CO_CURRICULAR' ? 'Co-Curricular' : 'Academic'),
+          components,
+          hasAdditionalComponents: !!alloc.hasAdditionalComponents,
+          additionalComponents: alloc.additionalComponents || [],
+          totalAdditionalMarks: alloc.totalAdditionalMarks || 0,
+          isConfigured: !!es,
+          status: es ? 'CONFIGURED' : 'NOT_CONFIGURED'
+        });
+      }
+    }
+
+    // Include any active ExaminationSubjectInfo whose classSubject allocation might not be in active classSubjectDocs
+    for (const es of examSubjectDocs) {
+      const key = `${es.examinationRef.toString()}_${es.classRef.toString()}_${es.subjectRef.toString()}`;
+      if (includedKeys.has(key)) continue;
+      const ex = examMap.get(es.examinationRef.toString());
+      if (!ex) continue;
+      const cls = classInfoMap.get(es.classRef.toString());
+      const components = compMap.get(es._id.toString()) || [];
+
+      mergedRows.push({
+        _id: es._id,
+        examinationSubjectId: es._id,
+        examinationId: ex._id,
+        examinationCode: ex.examinationCode,
+        examinationName: ex.examinationName,
+        examinationStatus: ex.status,
+        academicYearRef: (ex.academicYearRef?._id || ex.academicYearRef).toString(),
+        academicYearName: ex.academicYearRef?.yearName || 'N/A',
+        classId: es.classRef,
+        classCode: cls?.classCode || '',
+        className: cls?.className || 'N/A',
+        subjectId: es.subjectRef,
+        subjectCode: es.subjectCode,
+        subjectName: es.subjectName,
+        subjectType: es.subjectType,
+        totalMaximumMarks: es.totalMaximumMarks,
+        passingMarks: null,
+        assessmentType:
+          components.length > 0
+            ? `${es.subjectType === 'CO_CURRICULAR' ? 'Co-Curricular' : 'Academic'} (${components.map(c => c.componentName).join(', ')})`
+            : `${es.subjectType === 'CO_CURRICULAR' ? 'Co-Curricular' : 'Academic'} (No Components)`,
+        components,
+        hasAdditionalComponents: false,
+        additionalComponents: [],
+        totalAdditionalMarks: 0,
+        isConfigured: true,
+        status: 'CONFIGURED'
+      });
+    }
+
+    // Filter by Examination, Class, Subject first for contextual summary, then ConfigStatus & Search
+    let filtered = mergedRows;
+    if (examinationId && examinationId !== 'ALL') {
+      filtered = filtered.filter(r => r.examinationId.toString() === examinationId.toString());
+    }
+    if (classId && classId !== 'ALL') {
+      filtered = filtered.filter(r => r.classId.toString() === classId.toString());
+    }
+    if (subjectId && subjectId !== 'ALL') {
+      filtered = filtered.filter(r => r.subjectId.toString() === subjectId.toString());
+    }
+
+    const summary = {
+      totalRecords: filtered.length,
+      configuredCount: filtered.filter(r => r.isConfigured).length,
+      unconfiguredCount: filtered.filter(r => !r.isConfigured).length,
+      zeroMarksConfiguredCount: filtered.filter(r => r.isConfigured && r.totalMaximumMarks === 0).length
+    };
+
+    if (configStatus && configStatus !== 'ALL') {
+      const cleanCfg = configStatus.toUpperCase();
+      filtered = filtered.filter(r => r.status === cleanCfg);
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(r =>
+        r.examinationName.toLowerCase().includes(q) ||
+        r.examinationCode.toLowerCase().includes(q) ||
+        r.className.toLowerCase().includes(q) ||
+        r.subjectName.toLowerCase().includes(q) ||
+        r.subjectCode.toLowerCase().includes(q)
+      );
+    }
+
+    filtered.sort((a, b) => {
+      const exCmp = a.examinationName.localeCompare(b.examinationName);
+      if (exCmp !== 0) return exCmp;
+      const clsCmp = a.className.localeCompare(b.className);
+      if (clsCmp !== 0) return clsCmp;
+      return a.subjectName.localeCompare(b.subjectName);
+    });
+
+    const totalRecords = filtered.length;
+    const paginated = filtered.slice(skip, skip + limitNum);
+
+    return {
+      selectedAcademicYear: selectedYear,
+      availableAcademicYears: academicYears,
+      configurations: paginated,
+      summary,
+      filterOptions: {
+        examinations: scopeExams.map(e => ({
+          _id: e._id,
+          examinationCode: e.examinationCode,
+          examinationName: e.examinationName,
+          status: e.status
+        })),
+        classes: activeClasses,
+        subjects: activeSubjects
+      },
+      pagination: {
+        totalRecords,
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum) || 1,
+        limit: limitNum
+      }
+    };
+  }
+
+  /**
+   * 4.5 Marks Entry Monitoring (Read-Only)
+   */
+  static async getMarksEntryMonitoring({
+    schoolId,
+    academicYearId,
+    examinationId = 'ALL',
+    classId = 'ALL',
+    subjectId = 'ALL',
+    teacherId = 'ALL',
+    submissionStatus = 'ALL',
+    search = '',
+    page = 1,
+    limit = 10
+  }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 10));
+    const skip = (pageNum - 1) * limitNum;
+
+    const { selectedYear, academicYears, isAllYears, invalidYear } =
+      await this.resolveExaminationYearScope(sId, academicYearId);
+
+    const [activeClasses, activeSubjects, activeTeachers] = await Promise.all([
+      ClassInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ className: 1 }).select('_id classCode className').lean(),
+      SubjectInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ subjectName: 1 }).select('_id subjectCode subjectName').lean(),
+      UserInfo.find({ schoolId: sId, roleCode: 'TEACHER', status: 'ACTIVE' }).select('_id userId fullName').sort({ fullName: 1 }).lean()
+    ]);
+
+    const marksModuleStatus = {
+      isMarksCollectionAvailable: false,
+      message: 'Teacher marks-entry module is not yet active; displaying live student eligibility and assigned teacher readiness with 0 marks entered.'
+    };
+
+    if (invalidYear || (!isAllYears && !selectedYear)) {
+      return {
+        selectedAcademicYear: null,
+        availableAcademicYears: academicYears,
+        entries: [],
+        summary: {
+          totalEntries: 0,
+          pendingCount: 0,
+          inProgressCount: 0,
+          completedCount: 0,
+          submittedCount: 0,
+          totalStudentsSum: 0,
+          totalMarksEnteredSum: 0,
+          overallProgressPercentage: 0
+        },
+        marksModuleStatus,
+        filterOptions: { examinations: [], classes: activeClasses, subjects: activeSubjects, teachers: activeTeachers },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const examQuery = { schoolId: sId };
+    if (!isAllYears && selectedYear) {
+      examQuery.academicYearRef = selectedYear._id;
+    }
+
+    const scopeExams = await ExaminationInfo.find(examQuery)
+      .populate('academicYearRef', 'yearName yearCode')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const scopeExamIds = scopeExams.map(e => e._id);
+    if (scopeExamIds.length === 0) {
+      return {
+        selectedAcademicYear: selectedYear,
+        availableAcademicYears: academicYears,
+        entries: [],
+        summary: {
+          totalEntries: 0,
+          pendingCount: 0,
+          inProgressCount: 0,
+          completedCount: 0,
+          submittedCount: 0,
+          totalStudentsSum: 0,
+          totalMarksEnteredSum: 0,
+          overallProgressPercentage: 0
+        },
+        marksModuleStatus,
+        filterOptions: { examinations: [], classes: activeClasses, subjects: activeSubjects, teachers: activeTeachers },
+        pagination: { totalRecords: 0, currentPage: pageNum, totalPages: 1, limit: limitNum }
+      };
+    }
+
+    const [
+      examClassDocs,
+      examSubjectDocs,
+      sectionDocs,
+      teacherAssignmentDocs,
+      enrollmentAgg
+    ] = await Promise.all([
+      ExaminationClassInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      }).lean(),
+      ExaminationSubjectInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds },
+        status: 'ACTIVE'
+      }).lean(),
+      SectionInfo.find({ schoolId: sId, status: 'ACTIVE' }).sort({ sectionName: 1 }).lean(),
+      SubjectTeacherAssignmentInfo.find({
+        schoolId: sId,
+        ...(!isAllYears && selectedYear ? { academicYearRef: selectedYear._id } : {}),
+        status: 'ACTIVE'
+      }).lean(),
+      StudentEnrollmentInfo.aggregate([
+        {
+          $match: {
+            schoolId: sId,
+            status: 'ACTIVE',
+            ...(!isAllYears && selectedYear ? { academicYearRef: selectedYear._id } : {})
+          }
+        },
+        {
+          $group: {
+            _id: {
+              academicYearRef: '$academicYearRef',
+              classRef: '$classRef',
+              sectionRef: '$sectionRef'
+            },
+            count: { $sum: 1 }
+          }
+        }
+      ])
+    ]);
+
+    const examMap = new Map();
+    for (const ex of scopeExams) {
+      examMap.set(ex._id.toString(), ex);
+    }
+
+    const examClassMap = new Map();
+    for (const ec of examClassDocs) {
+      examClassMap.set(`${ec.examinationRef.toString()}_${ec.classRef.toString()}`, ec);
+    }
+
+    const sectionsByClass = new Map();
+    for (const sec of sectionDocs) {
+      const cKey = sec.classRef.toString();
+      if (!sectionsByClass.has(cKey)) sectionsByClass.set(cKey, []);
+      sectionsByClass.get(cKey).push(sec);
+    }
+
+    const assignmentMap = new Map();
+    for (const a of teacherAssignmentDocs) {
+      assignmentMap.set(
+        `${a.academicYearRef.toString()}_${a.classRef.toString()}_${a.sectionRef.toString()}_${a.subjectRef.toString()}`,
+        a
+      );
+    }
+
+    const sectionEnrollmentMap = new Map();
+    const classEnrollmentMap = new Map();
+    for (const item of enrollmentAgg) {
+      const ay = item._id.academicYearRef?.toString();
+      const cls = item._id.classRef?.toString();
+      const sec = item._id.sectionRef?.toString();
+      if (ay && cls) {
+        classEnrollmentMap.set(`${ay}_${cls}`, (classEnrollmentMap.get(`${ay}_${cls}`) || 0) + item.count);
+        if (sec) {
+          sectionEnrollmentMap.set(`${ay}_${cls}_${sec}`, item.count);
+        }
+      }
+    }
+
+    const classInfoMap = new Map();
+    for (const c of activeClasses) {
+      classInfoMap.set(c._id.toString(), c);
+    }
+
+    const rows = [];
+    for (const es of examSubjectDocs) {
+      const ex = examMap.get(es.examinationRef.toString());
+      if (!ex) continue;
+      const ec = examClassMap.get(`${es.examinationRef.toString()}_${es.classRef.toString()}`);
+      if (!ec) continue; // Skip if class was deactivated from examination
+
+      const ayId = (ex.academicYearRef?._id || ex.academicYearRef).toString();
+      const cId = es.classRef.toString();
+      const clsMeta = classInfoMap.get(cId);
+      const className = ec.className || clsMeta?.className || 'N/A';
+      const classCode = ec.classCode || clsMeta?.classCode || '';
+
+      const classSections = sectionsByClass.get(cId) || [];
+
+      if (classSections.length > 0) {
+        for (const sec of classSections) {
+          const totalStudents = sectionEnrollmentMap.get(`${ayId}_${cId}_${sec._id.toString()}`) || 0;
+          const assign = assignmentMap.get(`${ayId}_${cId}_${sec._id.toString()}_${es.subjectRef.toString()}`);
+
+          const marksEntered = 0; // Actual marks records = 0 until Teacher marks-entry module records marks
+          const pending = totalStudents;
+          const progressPercentage = totalStudents > 0 ? Math.round((marksEntered / totalStudents) * 100) : 0;
+          const rowStatus = 'PENDING';
+
+          rows.push({
+            _id: `${es._id}_${sec._id}`,
+            examinationSubjectId: es._id,
+            examinationId: ex._id,
+            examinationCode: ex.examinationCode,
+            examinationName: ex.examinationName,
+            examinationStatus: ex.status,
+            academicYearRef: ayId,
+            academicYearName: ex.academicYearRef?.yearName || 'N/A',
+            classId: es.classRef,
+            classCode,
+            className,
+            sectionId: sec._id,
+            sectionCode: sec.sectionCode,
+            sectionName: sec.sectionName,
+            subjectId: es.subjectRef,
+            subjectCode: es.subjectCode,
+            subjectName: es.subjectName,
+            subjectType: es.subjectType,
+            totalMaximumMarks: es.totalMaximumMarks,
+            assignedTeacherRef: assign?.teacherUserRef || null,
+            assignedTeacherName: assign?.teacherName || null,
+            assignedTeacherUserId: assign?.teacherUserId || null,
+            assignedTeacherEmail: assign?.teacherEmail || null,
+            hasAssignedTeacher: !!assign,
+            totalStudents,
+            marksEntered,
+            pending,
+            progressPercentage,
+            submissionStatus: rowStatus
+          });
+        }
+      } else {
+        const totalStudents = classEnrollmentMap.get(`${ayId}_${cId}`) || 0;
+        const marksEntered = 0;
+        const pending = totalStudents;
+        const progressPercentage = totalStudents > 0 ? Math.round((marksEntered / totalStudents) * 100) : 0;
+
+        rows.push({
+          _id: `${es._id}_CLASS`,
+          examinationSubjectId: es._id,
+          examinationId: ex._id,
+          examinationCode: ex.examinationCode,
+          examinationName: ex.examinationName,
+          examinationStatus: ex.status,
+          academicYearRef: ayId,
+          academicYearName: ex.academicYearRef?.yearName || 'N/A',
+          classId: es.classRef,
+          classCode,
+          className,
+          sectionId: null,
+          sectionCode: '',
+          sectionName: null,
+          subjectId: es.subjectRef,
+          subjectCode: es.subjectCode,
+          subjectName: es.subjectName,
+          subjectType: es.subjectType,
+          totalMaximumMarks: es.totalMaximumMarks,
+          assignedTeacherRef: null,
+          assignedTeacherName: null,
+          assignedTeacherUserId: null,
+          assignedTeacherEmail: null,
+          hasAssignedTeacher: false,
+          totalStudents,
+          marksEntered,
+          pending,
+          progressPercentage,
+          submissionStatus: 'PENDING'
+        });
+      }
+    }
+
+    // Apply filters
+    let filtered = rows;
+    if (examinationId && examinationId !== 'ALL') {
+      filtered = filtered.filter(r => r.examinationId.toString() === examinationId.toString());
+    }
+    if (classId && classId !== 'ALL') {
+      filtered = filtered.filter(r => r.classId.toString() === classId.toString());
+    }
+    if (subjectId && subjectId !== 'ALL') {
+      filtered = filtered.filter(r => r.subjectId.toString() === subjectId.toString());
+    }
+    if (teacherId && teacherId !== 'ALL') {
+      if (teacherId === 'UNASSIGNED') {
+        filtered = filtered.filter(r => !r.hasAssignedTeacher);
+      } else {
+        filtered = filtered.filter(r => r.assignedTeacherRef && r.assignedTeacherRef.toString() === teacherId.toString());
+      }
+    }
+
+    const totalStudentsSum = filtered.reduce((s, r) => s + r.totalStudents, 0);
+    const totalMarksEnteredSum = filtered.reduce((s, r) => s + r.marksEntered, 0);
+
+    const summary = {
+      totalEntries: filtered.length,
+      pendingCount: filtered.filter(r => r.submissionStatus === 'PENDING').length,
+      inProgressCount: filtered.filter(r => r.submissionStatus === 'IN_PROGRESS').length,
+      completedCount: filtered.filter(r => r.submissionStatus === 'COMPLETED').length,
+      submittedCount: filtered.filter(r => r.submissionStatus === 'SUBMITTED').length,
+      totalStudentsSum,
+      totalMarksEnteredSum,
+      overallProgressPercentage:
+        totalStudentsSum > 0 ? Math.round((totalMarksEnteredSum / totalStudentsSum) * 100) : 0
+    };
+
+    if (submissionStatus && submissionStatus !== 'ALL') {
+      const cleanSub = submissionStatus.toUpperCase();
+      filtered = filtered.filter(r => r.submissionStatus === cleanSub);
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(r =>
+        r.examinationName.toLowerCase().includes(q) ||
+        r.className.toLowerCase().includes(q) ||
+        (r.sectionName && r.sectionName.toLowerCase().includes(q)) ||
+        r.subjectName.toLowerCase().includes(q) ||
+        r.subjectCode.toLowerCase().includes(q) ||
+        (r.assignedTeacherName && r.assignedTeacherName.toLowerCase().includes(q))
+      );
+    }
+
+    filtered.sort((a, b) => {
+      const exCmp = a.examinationName.localeCompare(b.examinationName);
+      if (exCmp !== 0) return exCmp;
+      const clsCmp = a.className.localeCompare(b.className);
+      if (clsCmp !== 0) return clsCmp;
+      const secCmp = (a.sectionName || '').localeCompare(b.sectionName || '');
+      if (secCmp !== 0) return secCmp;
+      return a.subjectName.localeCompare(b.subjectName);
+    });
+
+    const totalRecords = filtered.length;
+    const paginated = filtered.slice(skip, skip + limitNum);
+
+    return {
+      selectedAcademicYear: selectedYear,
+      availableAcademicYears: academicYears,
+      entries: paginated,
+      summary,
+      marksModuleStatus,
+      filterOptions: {
+        examinations: scopeExams.map(e => ({
+          _id: e._id,
+          examinationCode: e.examinationCode,
+          examinationName: e.examinationName,
+          status: e.status
+        })),
+        classes: activeClasses,
+        subjects: activeSubjects,
+        teachers: activeTeachers
+      },
+      pagination: {
+        totalRecords,
+        currentPage: pageNum,
+        totalPages: Math.ceil(totalRecords / limitNum) || 1,
+        limit: limitNum
+      }
+    };
+  }
+
+  /**
+   * 4.6 Marks Entry Monitoring Details (Read-Only View Progress Modal)
+   */
+  static async getMarksEntryMonitoringDetails({
+    schoolId,
+    examinationId,
+    classId,
+    sectionId,
+    subjectId
+  }) {
+    if (!schoolId) {
+      throw new Error('School identification is required.');
+    }
+    const sId = schoolId.toUpperCase();
+
+    if (
+      !examinationId || !mongoose.Types.ObjectId.isValid(examinationId) ||
+      !classId || !mongoose.Types.ObjectId.isValid(classId) ||
+      !subjectId || !mongoose.Types.ObjectId.isValid(subjectId)
+    ) {
+      const err = new Error('Valid examinationId, classId, and subjectId are required.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const exam = await ExaminationInfo.findOne({ _id: examinationId, schoolId: sId })
+      .populate('academicYearRef', 'yearName yearCode')
+      .lean();
+
+    if (!exam) {
+      const err = new Error('Examination record not found for your school.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const ayId = exam.academicYearRef?._id || exam.academicYearRef;
+
+    const [classDoc, examSubject, sectionDoc] = await Promise.all([
+      ClassInfo.findOne({ _id: classId, schoolId: sId }).select('_id classCode className').lean(),
+      ExaminationSubjectInfo.findOne({
+        schoolId: sId,
+        examinationRef: examinationId,
+        classRef: classId,
+        subjectRef: subjectId,
+        status: 'ACTIVE'
+      }).lean(),
+      sectionId && mongoose.Types.ObjectId.isValid(sectionId)
+        ? SectionInfo.findOne({ _id: sectionId, classRef: classId, schoolId: sId }).select('_id sectionCode sectionName').lean()
+        : Promise.resolve(null)
+    ]);
+
+    if (!classDoc || !examSubject) {
+      const err = new Error('Examination subject configuration not found for the selected class.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const [components, assignment, enrollments] = await Promise.all([
+      ExaminationComponentInfo.find({
+        schoolId: sId,
+        examinationSubjectRef: examSubject._id
+      })
+        .sort({ sequence: 1 })
+        .lean(),
+      sectionDoc
+        ? SubjectTeacherAssignmentInfo.findOne({
+            schoolId: sId,
+            academicYearRef: ayId,
+            classRef: classId,
+            sectionRef: sectionDoc._id,
+            subjectRef: subjectId,
+            status: 'ACTIVE'
+          }).lean()
+        : Promise.resolve(null),
+      StudentEnrollmentInfo.find({
+        schoolId: sId,
+        academicYearRef: ayId,
+        classRef: classId,
+        ...(sectionDoc ? { sectionRef: sectionDoc._id } : {}),
+        status: 'ACTIVE'
+      })
+        .populate('studentRef', 'admissionNumber firstName middleName lastName status')
+        .populate('sectionRef', 'sectionName sectionCode')
+        .sort({ rollNumber: 1 })
+        .lean()
+    ]);
+
+    const pendingStudents = enrollments
+      .filter(e => e.studentRef)
+      .map(e => ({
+        studentId: e.studentRef._id,
+        admissionNumber: e.studentRef.admissionNumber,
+        rollNumber: e.rollNumber || '—',
+        fullName: [e.studentRef.firstName, e.studentRef.middleName, e.studentRef.lastName].filter(Boolean).join(' '),
+        sectionName: e.sectionRef?.sectionName || sectionDoc?.sectionName || '—',
+        status: 'PENDING'
+      }));
+
+    const totalStudents = pendingStudents.length;
+    const marksEntered = 0;
+    const pending = totalStudents;
+    const progressPercentage = totalStudents > 0 ? Math.round((marksEntered / totalStudents) * 100) : 0;
+
+    return {
+      examination: {
+        _id: exam._id,
+        examinationCode: exam.examinationCode,
+        examinationName: exam.examinationName,
+        startDate: exam.startDate,
+        endDate: exam.endDate,
+        status: exam.status,
+        academicYearName: exam.academicYearRef?.yearName || 'N/A'
+      },
+      classInfo: classDoc,
+      sectionInfo: sectionDoc,
+      subjectInfo: {
+        subjectId: examSubject.subjectRef,
+        subjectCode: examSubject.subjectCode,
+        subjectName: examSubject.subjectName,
+        subjectType: examSubject.subjectType,
+        totalMaximumMarks: examSubject.totalMaximumMarks,
+        components: components.map(c => ({
+          _id: c._id,
+          componentName: c.componentName,
+          maximumMarks: c.maximumMarks,
+          sequence: c.sequence
+        }))
+      },
+      assignedTeacher: assignment
+        ? {
+            isAssigned: true,
+            teacherName: assignment.teacherName,
+            teacherUserId: assignment.teacherUserId,
+            teacherEmail: assignment.teacherEmail
+          }
+        : {
+            isAssigned: false,
+            teacherName: null,
+            teacherUserId: null,
+            teacherEmail: null
+          },
+      progress: {
+        totalStudents,
+        marksEntered,
+        pending,
+        progressPercentage,
+        submissionStatus: 'PENDING'
+      },
+      pendingStudents,
+      isMarksModuleActive: false
+    };
+  }
 }
 
 module.exports = HeadTeacherService;

@@ -11,6 +11,7 @@ export const UserAuthProvider = ({ children }) => {
     const saved = localStorage.getItem('dmms_user_info');
     return saved ? JSON.parse(saved) : null;
   });
+  const [selectedPanel, setSelectedPanel] = useState(() => localStorage.getItem('dmms_active_panel') || null);
   const [loading, setLoading] = useState(true);
 
   // Synchronize with school authentication lifecycle
@@ -43,11 +44,24 @@ export const UserAuthProvider = ({ children }) => {
               fullName: res.profile.fullName,
               designation: res.profile.designation,
               profileImage: res.profile.profileImage,
+              signatureUrl: res.profile.signatureUrl,
+              teachingAccess: res.profile.teachingAccess || null,
               isFirstLogin: res.profile.isFirstLogin,
               mustChangePassword: res.profile.mustChangePassword
             };
             setCurrentUser(updated);
             localStorage.setItem('dmms_user_info', JSON.stringify(updated));
+            const storedPanel = localStorage.getItem('dmms_active_panel');
+            if (
+              updated.roleCode === 'HEAD_TEACHER' &&
+              updated.teachingAccess?.hasTeachingAccess &&
+              storedPanel === 'TEACHER'
+            ) {
+              setSelectedPanel('TEACHER');
+            } else {
+              setSelectedPanel(updated.roleCode);
+              localStorage.setItem('dmms_active_panel', updated.roleCode);
+            }
           }
         } catch (err) {
           console.warn('[UserAuth] Session expired or invalid:', err.message);
@@ -60,19 +74,54 @@ export const UserAuthProvider = ({ children }) => {
     verifyUser();
   }, [userToken, isSchoolAuthenticated]);
 
-  const loginUser = (token, userData) => {
+  const loginUser = (token, userData, initialPanel = null) => {
     setUserToken(token);
     setCurrentUser(userData);
     localStorage.setItem('dmms_user_token', token);
     localStorage.setItem('dmms_user_info', JSON.stringify(userData));
+    const panelToUse =
+      userData?.roleCode === 'HEAD_TEACHER' &&
+      userData?.teachingAccess?.hasTeachingAccess &&
+      initialPanel === 'TEACHER'
+        ? 'TEACHER'
+        : userData?.roleCode || null;
+    setSelectedPanel(panelToUse);
+    if (panelToUse) {
+      localStorage.setItem('dmms_active_panel', panelToUse);
+    }
   };
 
   const logoutUser = () => {
     setUserToken(null);
     setCurrentUser(null);
+    setSelectedPanel(null);
     localStorage.removeItem('dmms_user_token');
     localStorage.removeItem('dmms_user_info');
+    localStorage.removeItem('dmms_active_panel');
   };
+
+  const switchPanel = (panelCode) => {
+    if (!currentUser) return;
+    if (
+      panelCode === 'TEACHER' &&
+      currentUser.roleCode === 'HEAD_TEACHER' &&
+      currentUser.teachingAccess?.hasTeachingAccess
+    ) {
+      setSelectedPanel('TEACHER');
+      localStorage.setItem('dmms_active_panel', 'TEACHER');
+      return;
+    }
+    const nextPanel = currentUser.roleCode;
+    setSelectedPanel(nextPanel);
+    localStorage.setItem('dmms_active_panel', nextPanel);
+  };
+
+  const activePanel =
+    currentUser?.roleCode === 'HEAD_TEACHER' &&
+    currentUser?.teachingAccess?.hasTeachingAccess &&
+    selectedPanel === 'TEACHER'
+      ? 'TEACHER'
+      : currentUser?.roleCode || null;
 
   const updateUser = (fields) => {
     setCurrentUser((prev) => {
@@ -89,9 +138,11 @@ export const UserAuthProvider = ({ children }) => {
       value={{
         userToken,
         currentUser,
+        activePanel,
         isUserAuthenticated,
         loginUser,
         logoutUser,
+        switchPanel,
         updateUser,
         loading
       }}

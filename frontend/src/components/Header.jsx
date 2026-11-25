@@ -4,14 +4,14 @@ import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useAcademicYear } from '../context/AcademicYearContext';
 import NotificationDropdown from './NotificationDropdown';
-import { User, KeyRound, LogOut, Shield, ChevronDown, Calendar, Building2 } from 'lucide-react';
+import { User, KeyRound, LogOut, Shield, ChevronDown, Calendar, Building2, ArrowLeftRight } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 const Header = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentSchool, isSchoolAuthenticated, logoutSchool } = useSchoolAuth();
-  const { currentUser, isUserAuthenticated, logoutUser } = useUserAuth();
+  const { currentUser, activePanel, switchPanel, isUserAuthenticated, logoutUser } = useUserAuth();
   const { academicYears, selectedYear, switchAcademicYear } = useAcademicYear();
 
   // The authenticated dashboard layout must only render when both school and user auth states are valid,
@@ -54,6 +54,15 @@ const Header = () => {
   const handleAcademicYearChange = async (e) => {
     const yearId = e.target.value;
     await switchAcademicYear(yearId);
+  };
+
+  const canSwitchPanels =
+    currentUser?.roleCode === 'HEAD_TEACHER' && !!currentUser?.teachingAccess?.hasTeachingAccess;
+
+  const handlePanelSwitch = (targetPanel) => {
+    setProfileDropdownOpen(false);
+    switchPanel(targetPanel);
+    navigate('/dashboard');
   };
 
   const avatarUrl = currentUser?.profileImage
@@ -116,6 +125,27 @@ const Header = () => {
           <div className="flex items-center space-x-3 sm:space-x-4">
             {showDashboardHeader ? (
               <>
+                {/* Panel Switcher for Head Teachers with Teaching Responsibilities */}
+                {canSwitchPanels && (
+                  <button
+                    type="button"
+                    onClick={() => handlePanelSwitch(activePanel === 'TEACHER' ? 'HEAD_TEACHER' : 'TEACHER')}
+                    className={`hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      activePanel === 'TEACHER'
+                        ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                    }`}
+                    title={
+                      activePanel === 'TEACHER'
+                        ? 'Switch to Head Teacher Oversight Panel'
+                        : 'Switch to Teacher Panel (Your Teaching Assignments)'
+                    }
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>{activePanel === 'TEACHER' ? 'Head Teacher Panel' : 'Teacher Panel'}</span>
+                  </button>
+                )}
+
                 {/* 1. Academic Year Dropdown */}
                 <div className="flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700">
                   <Calendar className="w-3.5 h-3.5 text-blue-600" />
@@ -184,6 +214,16 @@ const Header = () => {
                       </div>
 
                       <div className="py-1">
+                        {canSwitchPanels && (
+                          <button
+                            type="button"
+                            onClick={() => handlePanelSwitch(activePanel === 'TEACHER' ? 'HEAD_TEACHER' : 'TEACHER')}
+                            className="w-full text-left flex items-center px-4 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors border-b border-slate-100"
+                          >
+                            <ArrowLeftRight className="w-4 h-4 mr-2.5 text-indigo-500" />
+                            {activePanel === 'TEACHER' ? 'Switch to Head Teacher Panel' : 'Switch to Teacher Panel'}
+                          </button>
+                        )}
                         <Link
                           to="/profile"
                           onClick={() => setProfileDropdownOpen(false)}

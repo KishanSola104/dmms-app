@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import HeadTeacherDashboard from '../components/headTeacher/HeadTeacherDashboard';
+import TeacherDashboard from '../components/teacher/TeacherDashboard';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useAcademicYear } from '../context/AcademicYearContext';
@@ -27,15 +28,29 @@ import {
 } from 'lucide-react';
 
 const DashboardPage = () => {
-  const { currentUser } = useUserAuth();
+  const { currentUser, activePanel } = useUserAuth();
   const { currentSchool } = useSchoolAuth();
   const { selectedYear } = useAcademicYear();
 
-  // If authenticated user is HEAD_TEACHER, render dedicated Head Teacher Dashboard
-  if (currentUser?.roleCode === 'HEAD_TEACHER') {
+  const isTeacherPanel =
+    activePanel === 'TEACHER' &&
+    (currentUser?.roleCode === 'TEACHER' ||
+      (currentUser?.roleCode === 'HEAD_TEACHER' && !!currentUser?.teachingAccess?.hasTeachingAccess));
+
+  // If active panel is HEAD_TEACHER, render dedicated Head Teacher Dashboard
+  if (currentUser?.roleCode === 'HEAD_TEACHER' && !isTeacherPanel) {
     return (
       <DashboardLayout>
         <HeadTeacherDashboard />
+      </DashboardLayout>
+    );
+  }
+
+  // If authenticated user is in Teacher Panel (TEACHER or HEAD_TEACHER with teaching duties), render Teacher Dashboard
+  if (isTeacherPanel) {
+    return (
+      <DashboardLayout>
+        <TeacherDashboard />
       </DashboardLayout>
     );
   }
@@ -386,6 +401,9 @@ const DashboardPage = () => {
                 Office Shortcuts
               </h3>
               <div className="space-y-2.5">
+                <Link to="/office/published-results" className="block p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800">
+                  Published Results &amp; Marksheets
+                </Link>
                 <Link to="/profile" className="block p-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-xs font-semibold text-slate-700">
                   Update My Profile
                 </Link>

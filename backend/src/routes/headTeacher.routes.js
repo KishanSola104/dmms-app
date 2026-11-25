@@ -52,4 +52,26 @@ router.get('/students/:studentId', HeadTeacherController.getStudentProfile);
 // ==========================================
 router.get('/students/:studentId/performance', HeadTeacherController.getStudentPerformance);
 
+// ==========================================
+// MODULE 4: EXAMINATION MANAGEMENT (READ-ONLY)
+// ==========================================
+router.get('/examinations', HeadTeacherController.listExaminations);
+router.get('/examinations/:examinationId', HeadTeacherController.getExaminationDetails);
+router.get('/examination-schedule', HeadTeacherController.getExaminationSchedule);
+router.get('/subject-configurations', HeadTeacherController.getSubjectConfigurations);
+router.get('/marks-entry-monitoring', HeadTeacherController.getMarksEntryMonitoring);
+router.get('/marks-entry-monitoring/details', HeadTeacherController.getMarksEntryMonitoringDetails);
+
+// ==========================================
+// RESULT REVIEW, APPROVAL, RETURN & PUBLISHING
+// ==========================================
+router.get('/results/batches', HeadTeacherController.listResultBatches);
+router.get('/results/details', HeadTeacherController.getResultBatchDetails);
+router.post('/results/review', HeadTeacherController.markResultUnderReview);
+router.post('/results/approve', HeadTeacherController.approveResultBatch);
+router.post('/results/return', HeadTeacherController.returnResultBatch);
+router.post('/results/publish', HeadTeacherController.publishResultBatch);
+router.get('/results/examination/:resultId/pdf', HeadTeacherController.downloadExaminationResultPdf);
+router.get('/results/final/:finalResultId/pdf', HeadTeacherController.downloadFinalResultPdf);
+
 module.exports = router;

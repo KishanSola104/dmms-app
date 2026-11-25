@@ -2,6 +2,7 @@ const AuthService = require('../services/auth.service');
 const UserInfo = require('../models/userInfo.model');
 const SchoolInfo = require('../models/schoolInfo.model');
 const EmployeeInfo = require('../models/employeeInfo.model');
+const TeacherAccessService = require('../services/teacherAccess.service');
 
 const verifyUserAuth = async (req, res, next) => {
   try {
@@ -70,4 +71,32 @@ const authorizeRoles = (...roles) => {
   };
 };
 
-module.exports = { verifyUserAuth, authorizeRoles };
+/**
+ * Assignment-based Teacher Access Guard
+ * Allows TEACHER always, and HEAD_TEACHER only when they hold active teaching or class-teacher assignments.
+ */
+const authorizeTeacherAccess = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required.'
+      });
+    }
+
+    const access = await TeacherAccessService.getTeacherAccessContext(req.user);
+    if (!access.hasTeachingAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Teacher Panel requires an active TEACHER role or teaching/class-teacher assignments.'
+      });
+    }
+
+    req.teacherAccess = access;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { verifyUserAuth, authorizeRoles, authorizeTeacherAccess };

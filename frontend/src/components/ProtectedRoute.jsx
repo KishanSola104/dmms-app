@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useUserAuth } from '../context/UserAuthContext';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles = null, requireTeacherAccess = false }) => {
   const { isSchoolAuthenticated, loading: schoolLoading } = useSchoolAuth();
   const { currentUser, isUserAuthenticated, loading: userLoading } = useUserAuth();
   const location = useLocation();
@@ -27,10 +27,22 @@ const ProtectedRoute = ({ children }) => {
   }
 
   // 3. Mandatory password change check (Rule 8.4)
-  // "Whenever a user logs in using a system-generated temporary password, the system should require them to change their password."
-  // "The user should not be allowed to access the normal dashboard until the mandatory password change is completed."
   if (currentUser?.mustChangePassword && location.pathname !== '/first-login-change-password') {
     return <Navigate to="/first-login-change-password" replace />;
+  }
+
+  // 4. Optional panel/role enforcement
+  if (requireTeacherAccess) {
+    const hasAccess =
+      currentUser?.roleCode === 'TEACHER' ||
+      (currentUser?.roleCode === 'HEAD_TEACHER' && !!currentUser?.teachingAccess?.hasTeachingAccess);
+    if (!hasAccess) {
+      return <Navigate to="/dashboard" replace />;
+    }
+  } else if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
+    if (!allowedRoles.includes(currentUser?.roleCode)) {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return children;

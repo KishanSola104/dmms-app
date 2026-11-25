@@ -2,6 +2,7 @@ const UserInfo = require('../models/userInfo.model');
 const EmployeeInfo = require('../models/employeeInfo.model');
 const SchoolInfo = require('../models/schoolInfo.model');
 const PasswordService = require('../services/password.service');
+const TeacherAccessService = require('../services/teacherAccess.service');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,6 +15,7 @@ class ProfileController {
       const user = await UserInfo.findById(req.user._id).populate('roleRef');
       const employee = await EmployeeInfo.findById(user.employeeRef);
       const school = await SchoolInfo.findOne({ schoolId: user.schoolId });
+      const teachingAccess = await TeacherAccessService.getTeacherAccessContext(user);
 
       return res.json({
         success: true,
@@ -26,12 +28,14 @@ class ProfileController {
           isFirstLogin: user.isFirstLogin,
           mustChangePassword: user.mustChangePassword,
           lastLogin: user.lastLogin,
+          teachingAccess,
 
           // Employee Details
           fullName: employee ? employee.fullName : '',
           mobileNumber: employee ? employee.mobileNumber : '',
           designation: employee ? employee.designation : '',
           profileImage: employee && employee.profileImage ? employee.profileImage : null,
+          signatureUrl: employee && employee.signatureUrl ? employee.signatureUrl : null,
           address: employee ? employee.address : '',
           qualification: employee ? employee.qualification : '',
           joiningDate: employee ? employee.joiningDate : null,
@@ -204,6 +208,90 @@ class ProfileController {
       return res.json({
         success: true,
         message: 'Password changed successfully.'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upload / Replace E-Signature (TEACHER and HEAD_TEACHER)
+   */
+  static async uploadSignature(req, res, next) {
+    try {
+      if (!['TEACHER', 'HEAD_TEACHER'].includes(req.user.roleCode)) {
+        if (req.file?.path && fs.existsSync(req.file.path)) {
+          try { fs.unlinkSync(req.file.path); } catch (e) {}
+        }
+        return res.status(403).json({
+          success: false,
+          message: 'Only Teachers and Head Teachers can manage marksheet e-signatures.'
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'Please select a signature image file (JPG, JPEG, or PNG) to upload.'
+        });
+      }
+
+      const employee = await EmployeeInfo.findById(req.user.employeeRef);
+      if (!employee) {
+        return res.status(404).json({ success: false, message: 'Employee profile record not found.' });
+      }
+
+      if (employee.signatureUrl) {
+        const oldPath = path.join(__dirname, '../../uploads/signatures', path.basename(employee.signatureUrl));
+        if (fs.existsSync(oldPath)) {
+          try { fs.unlinkSync(oldPath); } catch (e) {}
+        }
+      }
+
+      const signatureUrl = `/uploads/signatures/${req.file.filename}`;
+      employee.signatureUrl = signatureUrl;
+      await employee.save();
+
+      return res.json({
+        success: true,
+        message: 'E-Signature uploaded successfully.',
+        signatureUrl
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Delete E-Signature (TEACHER and HEAD_TEACHER)
+   */
+  static async deleteSignature(req, res, next) {
+    try {
+      if (!['TEACHER', 'HEAD_TEACHER'].includes(req.user.roleCode)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only Teachers and Head Teachers can manage marksheet e-signatures.'
+        });
+      }
+
+      const employee = await EmployeeInfo.findById(req.user.employeeRef);
+      if (!employee) {
+        return res.status(404).json({ success: false, message: 'Employee profile record not found.' });
+      }
+
+      if (employee.signatureUrl) {
+        const oldPath = path.join(__dirname, '../../uploads/signatures', path.basename(employee.signatureUrl));
+        if (fs.existsSync(oldPath)) {
+          try { fs.unlinkSync(oldPath); } catch (e) {}
+        }
+      }
+
+      employee.signatureUrl = null;
+      await employee.save();
+
+      return res.json({
+        success: true,
+        message: 'E-Signature removed successfully.'
       });
     } catch (error) {
       next(error);

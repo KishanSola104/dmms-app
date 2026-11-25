@@ -24,6 +24,7 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(true);
   const [saveLoading, setSaveLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
+  const [sigLoading, setSigLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -34,6 +35,7 @@ const ProfilePage = () => {
   const [qualification, setQualification] = useState('');
 
   const fileInputRef = useRef(null);
+  const sigInputRef = useRef(null);
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -140,6 +142,62 @@ const ProfilePage = () => {
       setErrorMessage(err.message || 'Failed to upload profile image.');
     } finally {
       setImageLoading(false);
+    }
+  };
+
+  const handleSignatureUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      setErrorMessage('Invalid signature format. Please upload a JPG, JPEG, or PNG image.');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMessage('Signature image size exceeds 2MB limit.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('signature', file);
+
+    setSigLoading(true);
+    try {
+      const res = await api.post('/profile/upload-signature', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.success && res.signatureUrl) {
+        setProfile(prev => ({ ...prev, signatureUrl: res.signatureUrl }));
+        updateUser({ signatureUrl: res.signatureUrl });
+        setSuccessMessage('E-Signature uploaded successfully!');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to upload e-signature.');
+    } finally {
+      setSigLoading(false);
+    }
+  };
+
+  const handleDeleteSignature = async () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    setSigLoading(true);
+    try {
+      const res = await api.delete('/profile/signature');
+      if (res.success) {
+        setProfile(prev => ({ ...prev, signatureUrl: null }));
+        updateUser({ signatureUrl: null });
+        setSuccessMessage('E-Signature removed successfully.');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to remove e-signature.');
+    } finally {
+      setSigLoading(false);
     }
   };
 
@@ -381,6 +439,69 @@ const ProfilePage = () => {
 
             </div>
 
+          </div>
+        )}
+
+        {/* E-Signature Management Card (Teachers and Head Teachers) */}
+        {!loading && ['TEACHER', 'HEAD_TEACHER'].includes(profile?.roleCode || currentUser?.roleCode) && (
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Digital E-Signature (Marksheet Output)</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Upload a transparent or clean-background signature image (PNG/JPG, max 2MB) for digital marksheets.
+                </p>
+              </div>
+              <input
+                type="file"
+                ref={sigInputRef}
+                onChange={handleSignatureUpload}
+                accept=".jpg,.jpeg,.png"
+                className="hidden"
+              />
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  disabled={sigLoading}
+                  onClick={() => sigInputRef.current?.click()}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg transition-colors"
+                >
+                  {sigLoading ? 'Uploading...' : profile?.signatureUrl ? 'Replace Signature' : 'Upload Signature'}
+                </button>
+                {profile?.signatureUrl && (
+                  <button
+                    type="button"
+                    disabled={sigLoading}
+                    onClick={handleDeleteSignature}
+                    className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {profile?.signatureUrl ? (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-700">Current Uploaded Signature</p>
+                  <p className="text-[11px] text-slate-500">
+                    Used on authorized examination and final marksheets when e-signatures are enabled.
+                  </p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-lg p-2">
+                  <img
+                    src={profile.signatureUrl}
+                    alt="E-Signature"
+                    className="h-14 max-w-[180px] object-contain"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-xs text-slate-500 text-center">
+                No e-signature uploaded yet. Printed marksheets will continue to provide physical signature space.
+              </div>
+            )}
           </div>
         )}
 

@@ -1,4 +1,5 @@
 const SchoolProfileService = require('../services/schoolProfile.service');
+const SchoolResultConfigService = require('../services/schoolResultConfig.service');
 
 class AdminSchoolProfileController {
   /**
@@ -48,6 +49,38 @@ class AdminSchoolProfileController {
         success: true,
         message: 'School logo uploaded successfully.',
         schoolLogoUrl: result.schoolLogoUrl
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get School Result & Grading Configuration
+   */
+  static async getResultConfig(req, res, next) {
+    try {
+      const config = await SchoolResultConfigService.getOrCreateConfig(req.user.schoolId);
+      return res.json({ success: true, config });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Update School Result & Grading Configuration
+   */
+  static async updateResultConfig(req, res, next) {
+    try {
+      const config = await SchoolResultConfigService.updateConfig(
+        req.user.schoolId,
+        req.user._id,
+        req.body
+      );
+      return res.json({
+        success: true,
+        message: `Result & grading policy updated (Version ${config.version}).`,
+        config
       });
     } catch (error) {
       next(error);

@@ -634,6 +634,17 @@ const HeadTeacherDashboard = () => {
                     </div>
                     <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
                   </Link>
+
+                  <Link
+                    to="/head-teacher/result-approval"
+                    className="flex items-center justify-between p-3 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl text-xs font-semibold text-purple-800 transition-colors"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                      <span>Result Review &amp; Publish</span>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-purple-500" />
+                  </Link>
                 </div>
               </div>
             </div>

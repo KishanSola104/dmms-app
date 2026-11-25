@@ -5,6 +5,7 @@ const SchoolInfo = require('../models/schoolInfo.model');
 const PasswordService = require('../services/password.service');
 const EmailService = require('../services/email.service');
 const AuthService = require('../services/auth.service');
+const TeacherAccessService = require('../services/teacherAccess.service');
 
 class AuthController {
   /**
@@ -90,11 +91,24 @@ class AuthController {
         });
       }
 
-      // Verify that selected role matches user's assigned role
-      if (user.roleCode !== roleCode.toUpperCase()) {
+      // Fetch teaching assignments context first (needed for HEAD_TEACHER dual-panel login)
+      const teachingAccess = await TeacherAccessService.getTeacherAccessContext(user);
+      const requestedRole = roleCode.toUpperCase();
+      const isHeadTeacherSwitchingToTeacher =
+        user.roleCode === 'HEAD_TEACHER' && requestedRole === 'TEACHER';
+
+      // Verify selected role matches user's assigned role, or is HEAD_TEACHER logging into Teacher Panel
+      if (user.roleCode !== requestedRole && !isHeadTeacherSwitchingToTeacher) {
         return res.status(401).json({
           success: false,
           message: 'The selected role does not match this user account.'
+        });
+      }
+
+      if (isHeadTeacherSwitchingToTeacher && !teachingAccess.hasTeachingAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your Head Teacher account does not have active teaching or class-teacher assignments for Teacher Panel access.'
         });
       }
 
@@ -121,13 +135,15 @@ class AuthController {
       user.lastLogin = new Date();
       await user.save();
 
-      // Generate user JWT token
+      // Generate user JWT token (retaining actual HEAD_TEACHER role, never downgrading)
       const userToken = AuthService.generateUserToken(user, req.school, employee);
+      const activePanel = isHeadTeacherSwitchingToTeacher ? 'TEACHER' : user.roleCode;
 
       return res.json({
         success: true,
         message: 'Login successful. Welcome back!',
         token: userToken,
+        activePanel,
         user: {
           userId: user.userId,
           email: user.email,
@@ -136,6 +152,8 @@ class AuthController {
           fullName: employee ? employee.fullName : '',
           designation: employee ? employee.designation : '',
           profileImage: employee ? employee.profileImage : null,
+          signatureUrl: employee ? employee.signatureUrl : null,
+          teachingAccess,
           isFirstLogin: user.isFirstLogin,
           mustChangePassword: user.mustChangePassword
         },

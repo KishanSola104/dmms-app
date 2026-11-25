@@ -1,4 +1,6 @@
 const HeadTeacherService = require('../services/headTeacher.service');
+const HeadTeacherResultService = require('../services/headTeacherResult.service');
+const TeacherResultService = require('../services/teacherResult.service');
 
 class HeadTeacherController {
   // ==========================================
@@ -298,6 +300,300 @@ class HeadTeacherController {
       });
 
       return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================
+  // MODULE 4: EXAMINATION MANAGEMENT (READ-ONLY)
+  // ==========================================
+  static async listExaminations(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const { academicYearId, examinationId, classId, status, search, page, limit } = req.query;
+
+      const data = await HeadTeacherService.listExaminations({
+        schoolId,
+        academicYearId,
+        examinationId,
+        classId,
+        status,
+        search,
+        page,
+        limit
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getExaminationDetails(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const { examinationId } = req.params;
+
+      const data = await HeadTeacherService.getExaminationDetails({
+        schoolId,
+        examinationId
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getExaminationSchedule(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const {
+        academicYearId,
+        examinationId,
+        classId,
+        subjectId,
+        dateFrom,
+        dateTo,
+        search,
+        page,
+        limit
+      } = req.query;
+
+      const data = await HeadTeacherService.getExaminationSchedule({
+        schoolId,
+        academicYearId,
+        examinationId,
+        classId,
+        subjectId,
+        dateFrom,
+        dateTo,
+        search,
+        page,
+        limit
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSubjectConfigurations(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const {
+        academicYearId,
+        examinationId,
+        classId,
+        subjectId,
+        configStatus,
+        search,
+        page,
+        limit
+      } = req.query;
+
+      const data = await HeadTeacherService.getSubjectConfigurations({
+        schoolId,
+        academicYearId,
+        examinationId,
+        classId,
+        subjectId,
+        configStatus,
+        search,
+        page,
+        limit
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getMarksEntryMonitoring(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const {
+        academicYearId,
+        examinationId,
+        classId,
+        subjectId,
+        teacherId,
+        submissionStatus,
+        search,
+        page,
+        limit
+      } = req.query;
+
+      const data = await HeadTeacherService.getMarksEntryMonitoring({
+        schoolId,
+        academicYearId,
+        examinationId,
+        classId,
+        subjectId,
+        teacherId,
+        submissionStatus,
+        search,
+        page,
+        limit
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getMarksEntryMonitoringDetails(req, res, next) {
+    try {
+      const schoolId = req.user.schoolId;
+      const { examinationId, classId, sectionId, subjectId } = req.query;
+
+      const data = await HeadTeacherService.getMarksEntryMonitoringDetails({
+        schoolId,
+        examinationId,
+        classId,
+        sectionId,
+        subjectId
+      });
+
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================
+  // RESULT REVIEW, APPROVAL, RETURN & PUBLISHING
+  // ==========================================
+  static async listResultBatches(req, res, next) {
+    try {
+      const { academicYearId, type, examinationId, classId, status } = req.query;
+      const data = await HeadTeacherResultService.listClassResultBatches({
+        schoolId: req.user.schoolId,
+        academicYearId,
+        type: type || 'FINAL',
+        examinationId,
+        classId,
+        status
+      });
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getResultBatchDetails(req, res, next) {
+    try {
+      const { academicYearId, type, examinationId, classId, sectionId } = req.query;
+      const data = await HeadTeacherResultService.getClassResultDetails({
+        schoolId: req.user.schoolId,
+        academicYearId,
+        type: type || 'FINAL',
+        examinationId,
+        classId,
+        sectionId
+      });
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async markResultUnderReview(req, res, next) {
+    try {
+      const { academicYearId, type, examinationId, classId, sectionId } = req.body;
+      const data = await HeadTeacherResultService.markUnderReview({
+        user: req.user,
+        type: type || 'FINAL',
+        academicYearId,
+        examinationId,
+        classId,
+        sectionId
+      });
+      return res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async approveResultBatch(req, res, next) {
+    try {
+      const { academicYearId, type, examinationId, classId, sectionId } = req.body;
+      const data = await HeadTeacherResultService.approveResults({
+        user: req.user,
+        type: type || 'FINAL',
+        academicYearId,
+        examinationId,
+        classId,
+        sectionId
+      });
+      return res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async returnResultBatch(req, res, next) {
+    try {
+      const { academicYearId, type, examinationId, classId, sectionId, reason } = req.body;
+      const data = await HeadTeacherResultService.returnResults({
+        user: req.user,
+        type: type || 'FINAL',
+        academicYearId,
+        examinationId,
+        classId,
+        sectionId,
+        reason
+      });
+      return res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async publishResultBatch(req, res, next) {
+    try {
+      const { academicYearId, type, examinationId, classId, sectionId } = req.body;
+      const data = await HeadTeacherResultService.publishResults({
+        user: req.user,
+        type: type || 'FINAL',
+        academicYearId,
+        examinationId,
+        classId,
+        sectionId
+      });
+      return res.json(data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async downloadExaminationResultPdf(req, res, next) {
+    try {
+      const { buffer, filename } = await TeacherResultService.generateTermResultPdf({
+        user: req.user,
+        resultId: req.params.resultId
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async downloadFinalResultPdf(req, res, next) {
+    try {
+      const { buffer, filename } = await TeacherResultService.generateFinalResultPdf({
+        user: req.user,
+        finalResultId: req.params.finalResultId
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      return res.send(buffer);
     } catch (error) {
       next(error);
     }

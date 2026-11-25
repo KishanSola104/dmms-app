@@ -81,7 +81,7 @@ const UserLoginPage = () => {
       });
 
       if (res.success && res.token) {
-        loginUser(res.token, res.user);
+        loginUser(res.token, res.user, res.activePanel || selectedRole);
 
         // Check for mandatory first login password change (Rule 8.4)
         if (res.mustChangePassword || res.user.mustChangePassword) {
