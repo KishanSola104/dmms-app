@@ -14,6 +14,10 @@ const ExaminationInfo = require('../models/examinationInfo.model');
 const ExaminationClassInfo = require('../models/examinationClassInfo.model');
 const ExaminationSubjectInfo = require('../models/examinationSubjectInfo.model');
 const ExaminationComponentInfo = require('../models/examinationComponentInfo.model');
+const MarksSubmissionInfo = require('../models/marksSubmissionInfo.model');
+const MarksEntryInfo = require('../models/marksEntryInfo.model');
+const ExaminationResultInfo = require('../models/examinationResultInfo.model');
+const FinalAcademicResultInfo = require('../models/finalAcademicResultInfo.model');
 
 class HeadTeacherService {
   /**
@@ -1524,21 +1528,51 @@ class HeadTeacherService {
       e.academicYearRef && targetAyId && e.academicYearRef._id.toString() === targetAyId.toString()
     ) || allEnrollments[0] || null;
 
-    // 5. Find configured examinations for the enrolled class and academic year
+    // 5. Find configured examinations & real marks/results for the enrolled class and academic year
     let examinations = [];
+    let finalResult = null;
     if (targetEnrollment && targetEnrollment.classRef) {
-      const examClasses = await ExaminationClassInfo.find({
-        schoolId: sId,
-        academicYearRef: targetEnrollment.academicYearRef._id,
-        classRef: targetEnrollment.classRef._id,
-        status: 'ACTIVE'
-      })
-        .populate('examinationRef')
-        .lean();
+      const targetAyRef = targetEnrollment.academicYearRef._id;
+      const [examClasses, examResults, studentMarksEntries, finalResDoc] = await Promise.all([
+        ExaminationClassInfo.find({
+          schoolId: sId,
+          academicYearRef: targetAyRef,
+          classRef: targetEnrollment.classRef._id,
+          status: 'ACTIVE'
+        })
+          .populate('examinationRef')
+          .lean(),
+        ExaminationResultInfo.find({
+          schoolId: sId,
+          academicYearRef: targetAyRef,
+          studentRef: student._id
+        }).lean(),
+        MarksEntryInfo.find({
+          schoolId: sId,
+          academicYearRef: targetAyRef,
+          studentRef: student._id
+        }).lean(),
+        FinalAcademicResultInfo.findOne({
+          schoolId: sId,
+          academicYearRef: targetAyRef,
+          studentRef: student._id
+        }).lean()
+      ]);
+
+      finalResult = finalResDoc || null;
+      const examResByExamId = new Map(examResults.map(er => [er.examinationRef.toString(), er]));
+      const marksByExamSubj = new Map();
+      for (const me of studentMarksEntries) {
+        if (me.examinationRef) {
+          marksByExamSubj.set(`${me.examinationRef.toString()}_${me.subjectRef.toString()}`, me);
+        }
+      }
 
       examinations = await Promise.all(examClasses.map(async (ec) => {
         const exam = ec.examinationRef;
         if (!exam) return null;
+
+        const examRes = examResByExamId.get(exam._id.toString()) || null;
 
         // Fetch subjects configured for this examination and class
         const examSubjects = await ExaminationSubjectInfo.find({
@@ -1550,7 +1584,10 @@ class HeadTeacherService {
           .populate('subjectRef', 'subjectName subjectCode subjectType')
           .lean();
 
-        // Fetch components for each subject
+        const resAcadMap = new Map((examRes?.academicSubjects || []).map(s => [s.subjectRef.toString(), s]));
+        const resCcMap = new Map((examRes?.coCurricularSubjects || []).map(s => [s.subjectRef.toString(), s]));
+
+        // Fetch components & actual student marks for each subject
         const subjectsWithComponents = await Promise.all(examSubjects.map(async (es) => {
           const components = await ExaminationComponentInfo.find({
             examinationSubjectRef: es._id,
@@ -1559,19 +1596,47 @@ class HeadTeacherService {
             .sort({ sequence: 1 })
             .lean();
 
+          const subjIdStr = (es.subjectRef?._id || es.subjectRef || '').toString();
+          const resAcad = resAcadMap.get(subjIdStr);
+          const resCc = resCcMap.get(subjIdStr);
+          const rawEntry = marksByExamSubj.get(`${exam._id.toString()}_${subjIdStr}`);
+
+          const marksObtained = resAcad
+            ? (resAcad.isAbsent ? 'AB' : resAcad.totalMarksObtained)
+            : (rawEntry ? (rawEntry.isAbsent ? 'AB' : rawEntry.totalMarksObtained) : null);
+
+          const grade = resAcad?.grade || resCc?.grade || rawEntry?.grade || '';
+          const percentage = resAcad?.percentage ?? (
+            typeof marksObtained === 'number' && es.totalMaximumMarks > 0
+              ? Math.round((marksObtained / es.totalMaximumMarks) * 10000) / 100
+              : null
+          );
+
           return {
             _id: es._id,
             subjectId: es.subjectRef?._id,
             subjectName: es.subjectName || es.subjectRef?.subjectName,
             subjectCode: es.subjectCode || es.subjectRef?.subjectCode,
             subjectType: es.subjectType || es.subjectRef?.subjectType || 'ACADEMIC',
-            totalMaximumMarks: es.totalMaximumMarks || 0,
-            components: components.map(c => ({
-              _id: c._id,
-              componentName: c.componentName,
-              maximumMarks: c.maximumMarks,
-              sequence: c.sequence
-            }))
+            totalMaximumMarks: resAcad?.totalMaximumMarks ?? es.totalMaximumMarks ?? 0,
+            marksObtained,
+            grade,
+            percentage,
+            isAbsent: Boolean(resAcad?.isAbsent ?? resCc?.isAbsent ?? rawEntry?.isAbsent),
+            isPassing: resAcad ? resAcad.isPassing : null,
+            entryStatus: examRes ? examRes.status : (rawEntry ? 'MARKS_ENTERED' : 'PENDING'),
+            components: components.map(c => {
+              const matchedComp =
+                (resAcad?.components || []).find(rc => rc.componentName === c.componentName) ||
+                (rawEntry?.componentMarks || []).find(mc => mc.componentName === c.componentName);
+              return {
+                _id: c._id,
+                componentName: c.componentName,
+                maximumMarks: c.maximumMarks,
+                marksObtained: matchedComp ? matchedComp.marksObtained : null,
+                sequence: c.sequence
+              };
+            })
           };
         }));
 
@@ -1586,13 +1651,27 @@ class HeadTeacherService {
           sectionName: targetEnrollment.sectionRef?.sectionName,
           totalSubjectsConfigured: subjectsWithComponents.length,
           subjects: subjectsWithComponents,
-          hasApprovedResults: false,
-          approvedResultsStatus: 'NOT_PUBLISHED'
+          hasApprovedResults: Boolean(examRes && ['APPROVED', 'PUBLISHED'].includes(examRes.status)),
+          approvedResultsStatus: examRes ? examRes.status : 'NOT_GENERATED',
+          examResultSummary: examRes
+            ? {
+                resultId: examRes._id,
+                totalMarksObtained: examRes.totalMarksObtained,
+                totalMaximumMarks: examRes.totalMaximumMarks,
+                percentage: examRes.percentage,
+                overallGrade: examRes.overallGrade,
+                resultStatus: examRes.resultStatus,
+                status: examRes.status,
+                termRemark: examRes.termRemark || ''
+              }
+            : null
         };
       }));
 
       examinations = examinations.filter(Boolean);
     }
+
+    const publishedOrApprovedCount = examinations.filter(e => e.hasApprovedResults).length;
 
     return {
       student: {
@@ -1626,10 +1705,25 @@ class HeadTeacherService {
       })),
       selectedAcademicYear: selectedYear,
       totalExaminationsConfigured: examinations.length,
-      totalApprovedResults: 0,
-      hasApprovedResults: false,
+      totalApprovedResults: publishedOrApprovedCount,
+      hasApprovedResults: publishedOrApprovedCount > 0 || Boolean(finalResult && ['APPROVED', 'PUBLISHED'].includes(finalResult.status)),
       examinations,
-      notice: 'Result publication module is not yet active. Only approved/published results will be displayed as final performance once results are published.'
+      finalResult: finalResult
+        ? {
+            _id: finalResult._id,
+            overallTotalObtained: finalResult.overallTotalObtained,
+            overallMaxMarks: finalResult.overallMaxMarks,
+            finalPercentage: finalResult.finalPercentage,
+            overallGrade: finalResult.overallGrade,
+            resultStatus: finalResult.resultStatus,
+            promotionStatus: finalResult.promotionStatus,
+            status: finalResult.status,
+            finalRemark: finalResult.finalRemark || '',
+            academicSubjects: finalResult.academicSubjects || [],
+            coCurricularSubjects: finalResult.coCurricularSubjects || []
+          }
+        : null,
+      notice: null
     };
   }
 
@@ -2766,8 +2860,8 @@ class HeadTeacherService {
     ]);
 
     const marksModuleStatus = {
-      isMarksCollectionAvailable: false,
-      message: 'Teacher marks-entry module is not yet active; displaying live student eligibility and assigned teacher readiness with 0 marks entered.'
+      isMarksCollectionAvailable: true,
+      message: 'Live marks-entry tracking enabled from Teacher submissions.'
     };
 
     if (invalidYear || (!isAllYears && !selectedYear)) {
@@ -2828,7 +2922,8 @@ class HeadTeacherService {
       examSubjectDocs,
       sectionDocs,
       teacherAssignmentDocs,
-      enrollmentAgg
+      enrollmentAgg,
+      submissionDocs
     ] = await Promise.all([
       ExaminationClassInfo.find({
         schoolId: sId,
@@ -2864,8 +2959,21 @@ class HeadTeacherService {
             count: { $sum: 1 }
           }
         }
-      ])
+      ]),
+      MarksSubmissionInfo.find({
+        schoolId: sId,
+        examinationRef: { $in: scopeExamIds }
+      }).lean()
     ]);
+
+    const submissionByKey = new Map();
+    for (const sub of submissionDocs) {
+      if (!sub.examinationRef) continue;
+      submissionByKey.set(
+        `${sub.examinationRef.toString()}_${sub.classRef.toString()}_${sub.sectionRef.toString()}_${sub.subjectRef.toString()}`,
+        sub
+      );
+    }
 
     const examMap = new Map();
     for (const ex of scopeExams) {
@@ -2930,11 +3038,21 @@ class HeadTeacherService {
         for (const sec of classSections) {
           const totalStudents = sectionEnrollmentMap.get(`${ayId}_${cId}_${sec._id.toString()}`) || 0;
           const assign = assignmentMap.get(`${ayId}_${cId}_${sec._id.toString()}_${es.subjectRef.toString()}`);
+          const subDoc = submissionByKey.get(`${ex._id.toString()}_${cId}_${sec._id.toString()}_${es.subjectRef.toString()}`);
 
-          const marksEntered = 0; // Actual marks records = 0 until Teacher marks-entry module records marks
-          const pending = totalStudents;
+          const marksEntered = subDoc ? Math.min(totalStudents || subDoc.totalStudents || 0, subDoc.enteredCount || 0) : 0;
+          const pending = Math.max(0, totalStudents - marksEntered);
           const progressPercentage = totalStudents > 0 ? Math.round((marksEntered / totalStudents) * 100) : 0;
-          const rowStatus = 'PENDING';
+          let rowStatus = 'PENDING';
+          if (subDoc) {
+            if (subDoc.status === 'DRAFT' && subDoc.enteredCount === 0 && !subDoc.lastEnteredBy) {
+              rowStatus = 'PENDING';
+            } else if (subDoc.status === 'DRAFT') {
+              rowStatus = 'IN_PROGRESS';
+            } else {
+              rowStatus = subDoc.status;
+            }
+          }
 
           rows.push({
             _id: `${es._id}_${sec._id}`,
@@ -2965,7 +3083,8 @@ class HeadTeacherService {
             marksEntered,
             pending,
             progressPercentage,
-            submissionStatus: rowStatus
+            submissionStatus: rowStatus,
+            isLocked: Boolean(subDoc?.isLocked)
           });
         }
       } else {
@@ -3154,7 +3273,7 @@ class HeadTeacherService {
       throw err;
     }
 
-    const [components, assignment, enrollments] = await Promise.all([
+    const [components, assignment, enrollments, subDoc] = await Promise.all([
       ExaminationComponentInfo.find({
         schoolId: sId,
         examinationSubjectRef: examSubject._id
@@ -3181,23 +3300,43 @@ class HeadTeacherService {
         .populate('studentRef', 'admissionNumber firstName middleName lastName status')
         .populate('sectionRef', 'sectionName sectionCode')
         .sort({ rollNumber: 1 })
-        .lean()
+        .lean(),
+      sectionDoc
+        ? MarksSubmissionInfo.findOne({
+            schoolId: sId,
+            academicYearRef: ayId,
+            examinationRef: examinationId,
+            classRef: classId,
+            sectionRef: sectionDoc._id,
+            subjectRef: subjectId
+          }).lean()
+        : Promise.resolve(null)
     ]);
+
+    const entries = subDoc
+      ? await MarksEntryInfo.find({ submissionRef: subDoc._id }).lean()
+      : [];
+    const entryByStu = new Map(entries.map(ent => [ent.studentRef.toString(), ent]));
 
     const pendingStudents = enrollments
       .filter(e => e.studentRef)
-      .map(e => ({
-        studentId: e.studentRef._id,
-        admissionNumber: e.studentRef.admissionNumber,
-        rollNumber: e.rollNumber || '—',
-        fullName: [e.studentRef.firstName, e.studentRef.middleName, e.studentRef.lastName].filter(Boolean).join(' '),
-        sectionName: e.sectionRef?.sectionName || sectionDoc?.sectionName || '—',
-        status: 'PENDING'
-      }));
+      .map(e => {
+        const ent = entryByStu.get(e.studentRef._id.toString());
+        const hasMarks = Boolean(ent && (ent.isAbsent || ent.totalMarksObtained !== null || ent.grade));
+        return {
+          studentId: e.studentRef._id,
+          admissionNumber: e.studentRef.admissionNumber,
+          rollNumber: e.rollNumber || '—',
+          fullName: [e.studentRef.firstName, e.studentRef.middleName, e.studentRef.lastName].filter(Boolean).join(' '),
+          sectionName: e.sectionRef?.sectionName || sectionDoc?.sectionName || '—',
+          marksObtained: ent ? (ent.isAbsent ? 'AB' : (ent.grade || ent.totalMarksObtained)) : null,
+          status: hasMarks ? (subDoc?.status || 'ENTERED') : 'PENDING'
+        };
+      });
 
     const totalStudents = pendingStudents.length;
-    const marksEntered = 0;
-    const pending = totalStudents;
+    const marksEntered = pendingStudents.filter(s => s.status !== 'PENDING').length;
+    const pending = Math.max(0, totalStudents - marksEntered);
     const progressPercentage = totalStudents > 0 ? Math.round((marksEntered / totalStudents) * 100) : 0;
 
     return {
@@ -3243,10 +3382,11 @@ class HeadTeacherService {
         marksEntered,
         pending,
         progressPercentage,
-        submissionStatus: 'PENDING'
+        submissionStatus: subDoc ? subDoc.status : 'PENDING',
+        isLocked: Boolean(subDoc?.isLocked)
       },
       pendingStudents,
-      isMarksModuleActive: false
+      isMarksModuleActive: true
     };
   }
 }

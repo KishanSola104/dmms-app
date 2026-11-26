@@ -29,10 +29,17 @@ import {
   Award,
   FileCheck2,
   Sparkles,
-  ListChecks
+  ListChecks,
+  Lock,
+  Bell,
+  History,
+  FileBarChart2,
+  RefreshCw,
+  ScrollText
 } from 'lucide-react';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
+import RestartApplicationModal from './RestartApplicationModal';
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -87,6 +94,7 @@ const Sidebar = () => {
   const [headTeacherExaminationOpen, setHeadTeacherExaminationOpen] = useState(true);
   const [teacherMarksOpen, setTeacherMarksOpen] = useState(true);
   const [teacherResultsOpen, setTeacherResultsOpen] = useState(true);
+  const [restartModalOpen, setRestartModalOpen] = useState(false);
 
   const isDualAccessHT =
     currentUser?.roleCode === 'HEAD_TEACHER' && !!currentUser?.teachingAccess?.hasTeachingAccess;
@@ -481,16 +489,16 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* HEAD TEACHER ONLY: Result Approval & Publishing */}
+        {/* HEAD TEACHER ONLY: Result Approval, Lock Controls, Reports, Notifications & Audit Log */}
         {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2 space-y-1">
             <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-              Result Approval &amp; Publishing
+              Result Approval &amp; Reports
             </div>
             <NavLink
               to="/head-teacher/result-approval"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -499,6 +507,71 @@ const Sidebar = () => {
             >
               <Award className="w-4 h-4 mr-3 text-purple-400" />
               <span>Result Review &amp; Publish</span>
+            </NavLink>
+            <NavLink
+              to="/head-teacher/marks-lock"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Lock className="w-4 h-4 mr-3 text-amber-400" />
+              <span>Marks Entry Lock Controls</span>
+            </NavLink>
+            <NavLink
+              to="/head-teacher/reports"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <FileBarChart2 className="w-4 h-4 mr-3 text-indigo-400" />
+              <span>Academic Reports</span>
+            </NavLink>
+            <NavLink
+              to="/head-teacher/notifications"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Bell className="w-4 h-4 mr-3 text-sky-400" />
+              <span>Notifications</span>
+            </NavLink>
+            <NavLink
+              to="/head-teacher/send-notifications"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Send className="w-4 h-4 mr-3 text-emerald-400" />
+              <span>Send Notifications</span>
+            </NavLink>
+            <NavLink
+              to="/head-teacher/audit-logs"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <ScrollText className="w-4 h-4 mr-3 text-slate-400" />
+              <span>Audit Log</span>
             </NavLink>
           </div>
         )}
@@ -697,11 +770,11 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* OFFICE STAFF ONLY: Published Results Portal */}
+        {/* OFFICE STAFF ONLY: Office & Academic Records Portal */}
         {effectivePanel === 'OFFICE_STAFF' && (
           <div className="pt-2 space-y-1">
             <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-              Result Records
+              Office &amp; Published Records
             </div>
             <NavLink
               to="/office/published-results"
@@ -715,6 +788,45 @@ const Sidebar = () => {
             >
               <FileCheck2 className="w-4 h-4 mr-3 text-amber-400" />
               <span>Published Results</span>
+            </NavLink>
+            <NavLink
+              to="/office/academic-reports"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <FileBarChart2 className="w-4 h-4 mr-3 text-indigo-400" />
+              <span>Academic Reports</span>
+            </NavLink>
+            <NavLink
+              to="/office/download-history"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <History className="w-4 h-4 mr-3 text-emerald-400" />
+              <span>Download History</span>
+            </NavLink>
+            <NavLink
+              to="/office/notifications"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Bell className="w-4 h-4 mr-3 text-sky-400" />
+              <span>Notifications</span>
             </NavLink>
           </div>
         )}
@@ -870,8 +982,8 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* ADMIN ONLY: Academic Management Expandable Menu (Module 3) */}
-        {currentUser?.roleCode === 'ADMIN' && (
+        {/* ADMIN & HEAD TEACHER: Academic Management Expandable Menu (Module 3) */}
+        {(currentUser?.roleCode === 'ADMIN' || effectivePanel === 'HEAD_TEACHER') && (
           <div className="pt-2">
             {/* Expandable Header */}
             <button
@@ -946,8 +1058,8 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* ADMIN ONLY: Student Management Expandable Menu (Module 4) */}
-        {currentUser?.roleCode === 'ADMIN' && (
+        {/* ADMIN & HEAD TEACHER: Student Management Expandable Menu (Module 4) */}
+        {(currentUser?.roleCode === 'ADMIN' || effectivePanel === 'HEAD_TEACHER') && (
           <div className="pt-2">
             <button
               type="button"
@@ -1080,6 +1192,41 @@ const Sidebar = () => {
           <span>Change Password</span>
         </NavLink>
 
+        {/* Admin only: Marks Entry Lock Controls & Audit Log */}
+        {currentUser?.roleCode === 'ADMIN' && (
+          <div className="pt-2 space-y-1">
+            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+              Governance &amp; Controls
+            </div>
+            <NavLink
+              to="/admin/marks-lock"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <Lock className="w-4 h-4 mr-3 text-amber-400" />
+              <span>Marks Entry Lock Controls</span>
+            </NavLink>
+            <NavLink
+              to="/admin/audit-logs"
+              className={({ isActive }) =>
+                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <ScrollText className="w-4 h-4 mr-3 text-indigo-400" />
+              <span>Audit Log</span>
+            </NavLink>
+          </div>
+        )}
+
         {/* Admin only: Change School Password */}
         {currentUser?.roleCode === 'ADMIN' && (
           <NavLink
@@ -1096,6 +1243,17 @@ const Sidebar = () => {
             <span>School Password</span>
           </NavLink>
         )}
+
+        {/* Controlled Application Restart (All 4 Authenticated Roles) */}
+        <button
+          type="button"
+          onClick={() => setRestartModalOpen(true)}
+          className="w-full flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg text-amber-400 hover:text-amber-300 hover:bg-slate-800/60 transition-colors"
+          title="Safely restart DMMS backend & frontend services"
+        >
+          <RefreshCw className="w-4 h-4 mr-3" />
+          <span>Restart Application</span>
+        </button>
       </div>
 
       {/* Bottom Switch School option */}
@@ -1109,6 +1267,11 @@ const Sidebar = () => {
           <span>Change / Exit School</span>
         </button>
       </div>
+
+      <RestartApplicationModal
+        isOpen={restartModalOpen}
+        onClose={() => setRestartModalOpen(false)}
+      />
     </aside>
   );
 };

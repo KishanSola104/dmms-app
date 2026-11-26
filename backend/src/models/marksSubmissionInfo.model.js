@@ -105,6 +105,50 @@ const marksSubmissionInfoSchema = new mongoose.Schema({
   requestedAt: {
     type: Date,
     default: null
+  },
+  // Explicit open/lock controls managed by Head Teacher / Admin
+  isLocked: {
+    type: Boolean,
+    default: false
+  },
+  lockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserInfo',
+    default: null
+  },
+  lockedByRole: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    default: null
+  },
+  lockedAt: {
+    type: Date,
+    default: null
+  },
+  lockReason: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  unlockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserInfo',
+    default: null
+  },
+  unlockedByRole: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    default: null
+  },
+  unlockedAt: {
+    type: Date,
+    default: null
+  },
+  updatedAfterSubmissionAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true,

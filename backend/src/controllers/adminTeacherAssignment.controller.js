@@ -74,7 +74,8 @@ class AdminTeacherAssignmentController {
         classRef,
         sectionRef,
         classSubjectRef,
-        teacherEmployeeId
+        teacherEmployeeId,
+        actorUser: req.user
       });
 
       return res.status(201).json({
@@ -98,7 +99,8 @@ class AdminTeacherAssignmentController {
       const result = await SubjectTeacherAssignmentService.reassignTeacher({
         schoolId: req.user.schoolId,
         assignmentId,
-        newTeacherEmployeeId
+        newTeacherEmployeeId,
+        actorUser: req.user
       });
 
       return res.json({
@@ -122,12 +124,38 @@ class AdminTeacherAssignmentController {
       const result = await SubjectTeacherAssignmentService.toggleAssignmentStatus({
         schoolId: req.user.schoolId,
         assignmentId,
-        status
+        status,
+        actorUser: req.user
       });
 
       return res.json({
         success: true,
         message: `Teacher assignment status updated to ${result.status}.`,
+        assignment: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Explicitly deallocate a teacher's subject assignment safely
+   */
+  static async deallocateAssignment(req, res, next) {
+    try {
+      const { assignmentId } = req.params;
+      const { reason } = req.body || {};
+
+      const result = await SubjectTeacherAssignmentService.deallocateAssignment({
+        schoolId: req.user.schoolId,
+        assignmentId,
+        reason,
+        actorUser: req.user
+      });
+
+      return res.json({
+        success: true,
+        message: `Deallocated ${result.subjectName} from ${result.teacherName} while preserving all historical marks and results.`,
         assignment: result
       });
     } catch (error) {

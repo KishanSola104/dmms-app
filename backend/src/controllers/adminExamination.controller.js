@@ -1,4 +1,5 @@
 const ExaminationService = require('../services/examination.service');
+const AuditLogService = require('../services/auditLog.service');
 
 class AdminExaminationController {
   /**
@@ -66,6 +67,20 @@ class AdminExaminationController {
         classIds
       });
 
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef,
+        examinationRef: result._id,
+        module: 'EXAMINATIONS',
+        entityType: 'ExaminationInfo',
+        entityId: result._id.toString(),
+        action: 'EXAMINATION_CREATED',
+        details: `Created examination '${result.examinationName}' (${result.examinationCode})`,
+        newValue: { examinationCode: result.examinationCode, examinationName: result.examinationName, status: result.status },
+        user: req.user
+      });
+
       return res.status(201).json({
         success: true,
         message: 'Examination created and assigned to classes successfully.',
@@ -105,6 +120,20 @@ class AdminExaminationController {
         classIds
       });
 
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef: result.academicYearRef,
+        examinationRef: result._id,
+        module: 'EXAMINATIONS',
+        entityType: 'ExaminationInfo',
+        entityId: result._id.toString(),
+        action: 'EXAMINATION_UPDATED',
+        details: `Updated examination '${result.examinationName}' (${result.examinationCode})`,
+        newValue: { examinationCode: result.examinationCode, examinationName: result.examinationName, status: result.status },
+        user: req.user
+      });
+
       return res.json({
         success: true,
         message: 'Examination updated successfully.',
@@ -127,6 +156,20 @@ class AdminExaminationController {
         schoolId: req.user.schoolId,
         examinationId,
         status
+      });
+
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef: result.academicYearRef,
+        examinationRef: result._id,
+        module: 'EXAMINATIONS',
+        entityType: 'ExaminationInfo',
+        entityId: result._id.toString(),
+        action: 'EXAMINATION_STATUS_UPDATED',
+        details: `Updated examination '${result.examinationName}' status to ${result.status}`,
+        newValue: { status: result.status },
+        user: req.user
       });
 
       return res.json({

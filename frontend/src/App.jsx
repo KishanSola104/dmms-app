@@ -59,9 +59,19 @@ import HeadTeacherExaminationSchedulePage from './pages/headTeacher/HeadTeacherE
 import HeadTeacherSubjectConfigPage from './pages/headTeacher/HeadTeacherSubjectConfigPage';
 import HeadTeacherMarksMonitoringPage from './pages/headTeacher/HeadTeacherMarksMonitoringPage';
 import HeadTeacherResultApprovalPage from './pages/headTeacher/HeadTeacherResultApprovalPage';
+import HeadTeacherAcademicReportsPage from './pages/headTeacher/HeadTeacherAcademicReportsPage';
+import HeadTeacherNotificationsPage from './pages/headTeacher/HeadTeacherNotificationsPage';
+import HeadTeacherSendNotificationsPage from './pages/headTeacher/HeadTeacherSendNotificationsPage';
+
+// Admin & Head Teacher Governance Pages
+import MarksEntryLockPage from './pages/admin/MarksEntryLockPage';
+import AuditLogPage from './pages/admin/AuditLogPage';
 
 // Office Staff Portal Pages
 import OfficePublishedResultsPage from './pages/office/OfficePublishedResultsPage';
+import OfficeAcademicReportsPage from './pages/office/OfficeAcademicReportsPage';
+import OfficeDownloadHistoryPage from './pages/office/OfficeDownloadHistoryPage';
+import OfficeNotificationsPage from './pages/office/OfficeNotificationsPage';
 
 // Teacher Panel Pages
 import TeacherDashboardPage from './pages/teacher/TeacherDashboardPage';
@@ -183,94 +193,112 @@ function App() {
                 }
               />
 
-              {/* Module 3: Academic Management Routes (Admin Only) */}
+              {/* Module 3: Academic Management Routes (Admin & Head Teacher) */}
               <Route
                 path="/admin/subject-allocation"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <SubjectAllocationPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/teacher-assignment"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <TeacherAssignmentPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/examinations"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <ExaminationManagementPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/examinations/:examinationId/subjects"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <ExaminationSubjectConfigPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
-              {/* Module 4: Student Management Routes (Admin Only) */}
+              {/* Module 4: Student Management Routes (Admin & Head Teacher) */}
               <Route
                 path="/admin/students"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <StudentListPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/students/admission"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <StudentAdmissionPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/students/enrollments"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <StudentEnrollmentPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/students/promotion"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <StudentPromotionPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/students/import"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <StudentImportPage />
-                  </AdminRoute>
+                  </ProtectedRoute>
                 }
               />
 
               <Route
                 path="/admin/students/:studentId"
                 element={
-                  <AdminRoute>
+                  <ProtectedRoute allowedRoles={['ADMIN', 'HEAD_TEACHER']}>
                     <StudentProfilePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin/marks-lock"
+                element={
+                  <AdminRoute>
+                    <MarksEntryLockPage />
+                  </AdminRoute>
+                }
+              />
+
+              <Route
+                path="/admin/audit-logs"
+                element={
+                  <AdminRoute>
+                    <AuditLogPage />
                   </AdminRoute>
                 }
               />
@@ -402,6 +430,46 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/head-teacher/marks-lock"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <MarksEntryLockPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/reports"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <HeadTeacherAcademicReportsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <HeadTeacherNotificationsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/send-notifications"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <HeadTeacherSendNotificationsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/head-teacher/audit-logs"
+                element={
+                  <ProtectedRoute allowedRoles={['HEAD_TEACHER', 'ADMIN']}>
+                    <AuditLogPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Office Staff Portal Routes */}
               <Route
@@ -409,6 +477,30 @@ function App() {
                 element={
                   <ProtectedRoute allowedRoles={['OFFICE_STAFF', 'ADMIN']}>
                     <OfficePublishedResultsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/office/academic-reports"
+                element={
+                  <ProtectedRoute allowedRoles={['OFFICE_STAFF', 'ADMIN']}>
+                    <OfficeAcademicReportsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/office/download-history"
+                element={
+                  <ProtectedRoute allowedRoles={['OFFICE_STAFF', 'ADMIN']}>
+                    <OfficeDownloadHistoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/office/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={['OFFICE_STAFF', 'ADMIN']}>
+                    <OfficeNotificationsPage />
                   </ProtectedRoute>
                 }
               />

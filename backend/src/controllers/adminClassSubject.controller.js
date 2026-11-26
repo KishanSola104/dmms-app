@@ -1,4 +1,5 @@
 const ClassSubjectService = require('../services/classSubject.service');
+const AuditLogService = require('../services/auditLog.service');
 
 class AdminClassSubjectController {
   /**
@@ -53,6 +54,20 @@ class AdminClassSubjectController {
         classRef,
         allocations
       });
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef,
+        classRef,
+        module: 'ACADEMIC',
+        entityType: 'ClassSubjectInfo',
+        entityId: classRef,
+        action: 'SUBJECTS_ALLOCATED',
+        details: `Allocated ${result.length} subject(s) to class`,
+        newValue: { count: result.length },
+        user: req.user
+      });
+
       return res.status(201).json({
         success: true,
         message: `${result.length} subject(s) successfully allocated.`,
@@ -76,6 +91,20 @@ class AdminClassSubjectController {
         hasAdditionalComponents,
         additionalComponents
       });
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef: result.academicYearRef,
+        classRef: result.classRef,
+        subjectRef: result.subjectRef,
+        module: 'ACADEMIC',
+        entityType: 'ClassSubjectInfo',
+        entityId: result._id.toString(),
+        action: 'SUBJECT_ALLOCATION_UPDATED',
+        details: `Updated subject allocation for ${result.subjectName}`,
+        user: req.user
+      });
+
       return res.json({
         success: true,
         message: 'Subject allocation updated successfully.',

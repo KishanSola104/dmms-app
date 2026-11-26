@@ -4,6 +4,8 @@ const EmployeeInfo = require('../models/employeeInfo.model');
 const UserInfo = require('../models/userInfo.model');
 const SchoolInfo = require('../models/schoolInfo.model');
 const HeadTeacherService = require('../services/headTeacher.service');
+const OfficeResultsService = require('../services/officeResults.service');
+const RestartService = require('../services/restart.service');
 
 class CommonController {
   /**
@@ -217,19 +219,13 @@ class CommonController {
           ]
         };
       } else if (roleCode === 'OFFICE_STAFF') {
+        const officeStats = await OfficeResultsService.getOfficeDashboard({
+          user: req.user,
+          academicYearId: activeAcademicYear ? activeAcademicYear._id : null
+        });
         roleSpecificData = {
           roleTitle: 'Office & Administrative Staff Portal',
-          stats: [
-            { title: 'Total School Employees', value: totalEmployees, icon: 'Users', color: 'blue' },
-            { title: 'Registered Students', value: 450, icon: 'UserCheck', color: 'emerald' },
-            { title: 'Office Enquiries', value: 12, icon: 'HelpCircle', color: 'indigo' },
-            { title: 'Academic Year', value: activeAcademicYear ? activeAcademicYear.yearCode : 'N/A', icon: 'Calendar', color: 'amber' }
-          ],
-          administrativeTasks: [
-            { task: 'Academic Record Verification', status: 'Pending Review', priority: 'High' },
-            { task: 'New Student Enrollment Documentation', status: 'In Progress', priority: 'Medium' },
-            { task: 'Contact Directory Verification', status: 'Completed', priority: 'Normal' }
-          ]
+          ...officeStats
         };
       }
 
@@ -238,6 +234,29 @@ class CommonController {
         academicYear: activeAcademicYear,
         ...roleSpecificData
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Controlled Restart Application Endpoint (All 4 authenticated user roles)
+   */
+  static async getRestartStatus(req, res, next) {
+    try {
+      return res.json({
+        success: true,
+        ...RestartService.getStatus()
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async restartApplication(req, res, next) {
+    try {
+      const result = await RestartService.requestRestart({ user: req.user });
+      return res.status(202).json(result);
     } catch (error) {
       next(error);
     }

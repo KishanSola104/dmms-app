@@ -48,6 +48,27 @@ const notificationInfoSchema = new mongoose.Schema({
   readAt: {
     type: Date,
     default: null
+  },
+  sentByUserRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserInfo',
+    default: null
+  },
+  sentByName: {
+    type: String,
+    trim: true,
+    default: 'System'
+  },
+  sentByRole: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    default: 'SYSTEM'
+  },
+  batchId: {
+    type: String,
+    trim: true,
+    default: null
   }
 }, {
   timestamps: true,

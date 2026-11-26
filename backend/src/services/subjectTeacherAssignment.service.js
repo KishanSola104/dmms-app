@@ -8,6 +8,7 @@ const AcademicYearInfo = require('../models/academicYearInfo.model');
 const UserInfo = require('../models/userInfo.model');
 const EmployeeInfo = require('../models/employeeInfo.model');
 const NotificationInfo = require('../models/notificationInfo.model');
+const AuditLogService = require('./auditLog.service');
 
 class SubjectTeacherAssignmentService {
   /**
@@ -299,7 +300,8 @@ class SubjectTeacherAssignmentService {
     classRef,
     sectionRef,
     classSubjectRef,
-    teacherEmployeeId
+    teacherEmployeeId,
+    actorUser = null
   }) {
     if (!academicYearRef || !classRef || !sectionRef || !classSubjectRef || !teacherEmployeeId) {
       throw new Error('Academic Year, Class, Section, Subject, and Teacher are mandatory.');
@@ -412,13 +414,38 @@ class SubjectTeacherAssignmentService {
       oldTeacherUser: null
     });
 
+    if (actorUser) {
+      await AuditLogService.log({
+        schoolRef,
+        schoolId,
+        academicYearRef,
+        classRef: classDoc._id,
+        sectionRef: sectionDoc._id,
+        subjectRef: classSubject.subjectRef,
+        module: 'TEACHER_ASSIGNMENT',
+        entityType: 'SubjectTeacherAssignmentInfo',
+        entityId: assignment._id.toString(),
+        action: 'TEACHER_ASSIGNED',
+        details: `Assigned ${assignment.teacherName} to ${assignment.subjectName} (${assignment.className} - ${assignment.sectionName})`,
+        newValue: {
+          teacherName: assignment.teacherName,
+          teacherUserId: assignment.teacherUserId,
+          subjectName: assignment.subjectName,
+          className: assignment.className,
+          sectionName: assignment.sectionName,
+          status: 'ACTIVE'
+        },
+        user: actorUser
+      });
+    }
+
     return assignment;
   }
 
   /**
    * Reassign a teacher to an existing assignment
    */
-  static async reassignTeacher({ schoolId, assignmentId, newTeacherEmployeeId }) {
+  static async reassignTeacher({ schoolId, assignmentId, newTeacherEmployeeId, actorUser = null }) {
     if (!assignmentId || !newTeacherEmployeeId) {
       throw new Error('Assignment ID and new Teacher are required.');
     }
@@ -459,6 +486,8 @@ class SubjectTeacherAssignmentService {
     const academicYear = await AcademicYearInfo.findById(assignment.academicYearRef);
 
     // Update assignment
+    const prevTeacherName = assignment.teacherName;
+    const prevTeacherUserId = assignment.teacherUserId;
     assignment.teacherEmployeeRef = newTeacherEmployeeId;
     assignment.teacherUserRef = newTeacherUser._id;
     assignment.teacherName = newTeacherUser.employeeRef.fullName || newTeacherUser.userId;
@@ -481,13 +510,99 @@ class SubjectTeacherAssignmentService {
       });
     }
 
+    if (actorUser) {
+      await AuditLogService.log({
+        schoolRef: assignment.schoolRef,
+        schoolId,
+        academicYearRef: assignment.academicYearRef,
+        classRef: assignment.classRef,
+        sectionRef: assignment.sectionRef,
+        subjectRef: assignment.subjectRef,
+        module: 'TEACHER_ASSIGNMENT',
+        entityType: 'SubjectTeacherAssignmentInfo',
+        entityId: assignment._id.toString(),
+        action: 'TEACHER_REASSIGNED',
+        details: `Reassigned ${assignment.subjectName} (${assignment.className} - ${assignment.sectionName}) from ${prevTeacherName} to ${assignment.teacherName}`,
+        previousValue: { teacherName: prevTeacherName, teacherUserId: prevTeacherUserId },
+        newValue: { teacherName: assignment.teacherName, teacherUserId: assignment.teacherUserId },
+        user: actorUser
+      });
+    }
+
+    return assignment;
+  }
+
+  /**
+   * Deallocate a subject assignment safely (preserves all historical marks & results)
+   */
+  static async deallocateAssignment({ schoolId, assignmentId, reason = '', actorUser = null }) {
+    const assignment = await SubjectTeacherAssignmentInfo.findOne({
+      _id: assignmentId,
+      schoolId
+    });
+    if (!assignment) {
+      throw new Error('Teacher assignment record not found.');
+    }
+    if (assignment.status === 'INACTIVE') {
+      throw new Error('This subject assignment has already been deallocated.');
+    }
+
+    assignment.status = 'INACTIVE';
+    await assignment.save();
+
+    try {
+      const teacherUser = await UserInfo.findOne({
+        _id: assignment.teacherUserRef,
+        schoolId,
+        status: 'ACTIVE'
+      }).lean();
+
+      if (teacherUser) {
+        await NotificationInfo.create({
+          schoolRef: assignment.schoolRef,
+          schoolId,
+          targetUserRef: teacherUser._id,
+          targetUserId: teacherUser.userId,
+          targetRoleCode: teacherUser.roleCode,
+          title: 'Subject Assignment Deallocated',
+          message: `Your assignment for ${assignment.subjectName} (${assignment.subjectCode}) in ${assignment.className}, ${assignment.sectionName} has been deallocated.${reason ? ` Note: ${reason.trim()}` : ''}`,
+          type: 'warning',
+          isRead: false,
+          sentByUserRef: actorUser?._id || null,
+          sentByName: actorUser?.employeeRef?.fullName || actorUser?.userId || 'System',
+          sentByRole: actorUser?.roleCode || 'SYSTEM'
+        });
+      }
+    } catch (notifErr) {
+      console.warn('[SubjectTeacherAssignmentService] Deallocation notification warning:', notifErr.message);
+    }
+
+    if (actorUser) {
+      await AuditLogService.log({
+        schoolRef: assignment.schoolRef,
+        schoolId,
+        academicYearRef: assignment.academicYearRef,
+        classRef: assignment.classRef,
+        sectionRef: assignment.sectionRef,
+        subjectRef: assignment.subjectRef,
+        module: 'TEACHER_ASSIGNMENT',
+        entityType: 'SubjectTeacherAssignmentInfo',
+        entityId: assignment._id.toString(),
+        action: 'SUBJECT_DEALLOCATED',
+        details: `Deallocated ${assignment.subjectName} (${assignment.className} - ${assignment.sectionName}) from ${assignment.teacherName}${reason ? `. Reason: ${reason.trim()}` : ''}`,
+        previousValue: { status: 'ACTIVE', teacherName: assignment.teacherName, teacherUserId: assignment.teacherUserId },
+        newValue: { status: 'INACTIVE' },
+        user: actorUser
+      });
+    }
+
     return assignment;
   }
 
   /**
    * Toggle status of an assignment (ACTIVE / INACTIVE)
    */
-  static async toggleAssignmentStatus({ schoolId, assignmentId, status }) {
+  static async toggleAssignmentStatus({ schoolId, assignmentId, status, actorUser = null }) {
     const assignment = await SubjectTeacherAssignmentInfo.findOne({
       _id: assignmentId,
       schoolId
@@ -520,8 +635,28 @@ class SubjectTeacherAssignmentService {
       }
     }
 
+    const prevStatus = assignment.status;
     assignment.status = cleanStatus;
     await assignment.save();
+
+    if (actorUser) {
+      await AuditLogService.log({
+        schoolRef: assignment.schoolRef,
+        schoolId,
+        academicYearRef: assignment.academicYearRef,
+        classRef: assignment.classRef,
+        sectionRef: assignment.sectionRef,
+        subjectRef: assignment.subjectRef,
+        module: 'TEACHER_ASSIGNMENT',
+        entityType: 'SubjectTeacherAssignmentInfo',
+        entityId: assignment._id.toString(),
+        action: cleanStatus === 'INACTIVE' ? 'SUBJECT_DEALLOCATED' : 'TEACHER_ASSIGNMENT_ACTIVATED',
+        details: `${cleanStatus === 'INACTIVE' ? 'Deallocated' : 'Activated'} ${assignment.subjectName} (${assignment.className} - ${assignment.sectionName}) for ${assignment.teacherName}`,
+        previousValue: { status: prevStatus },
+        newValue: { status: cleanStatus },
+        user: actorUser
+      });
+    }
 
     return assignment;
   }

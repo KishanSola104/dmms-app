@@ -1,5 +1,6 @@
 const HeadTeacherService = require('../services/headTeacher.service');
 const HeadTeacherResultService = require('../services/headTeacherResult.service');
+const HeadTeacherModule6Service = require('../services/headTeacherModule6.service');
 const TeacherResultService = require('../services/teacherResult.service');
 
 class HeadTeacherController {
@@ -573,12 +574,12 @@ class HeadTeacherController {
 
   static async downloadExaminationResultPdf(req, res, next) {
     try {
-      const { buffer, filename } = await TeacherResultService.generateTermResultPdf({
+      const { buffer, fileName } = await TeacherResultService.generateTermResultPdf({
         user: req.user,
         resultId: req.params.resultId
       });
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader('Content-Disposition', `inline; filename="${fileName || 'exam-result.pdf'}"`);
       return res.send(buffer);
     } catch (error) {
       next(error);
@@ -587,13 +588,119 @@ class HeadTeacherController {
 
   static async downloadFinalResultPdf(req, res, next) {
     try {
-      const { buffer, filename } = await TeacherResultService.generateFinalResultPdf({
+      const { buffer, fileName } = await TeacherResultService.generateFinalResultPdf({
         user: req.user,
         finalResultId: req.params.finalResultId
       });
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader('Content-Disposition', `inline; filename="${fileName || 'final-result.pdf'}"`);
       return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ==========================================
+  // MODULE 6: ACADEMIC REPORTS & NOTIFICATIONS
+  // ==========================================
+  static async getAcademicReports(req, res, next) {
+    try {
+      const { academicYearId, examinationId, classId, sectionId, subjectId } = req.query;
+      const data = await HeadTeacherModule6Service.getAcademicReports({
+        schoolId: req.user.schoolId,
+        academicYearId,
+        examinationId,
+        classId,
+        sectionId,
+        subjectId
+      });
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async downloadAcademicReportPdf(req, res, next) {
+    try {
+      const {
+        academicYearId,
+        reportSection,
+        examinationId,
+        classId,
+        sectionId,
+        subjectId
+      } = req.query;
+
+      const { buffer, fileName } = await HeadTeacherModule6Service.generateAcademicReportPdf({
+        user: req.user,
+        academicYearId,
+        reportSection,
+        examinationId,
+        classId,
+        sectionId,
+        subjectId
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName || 'academic-report.pdf'}"`);
+      return res.send(buffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getNotifications(req, res, next) {
+    try {
+      const { type, unreadOnly, page, limit } = req.query;
+      const data = await HeadTeacherModule6Service.getNotifications({
+        user: req.user,
+        type,
+        unreadOnly,
+        page,
+        limit
+      });
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getNotificationRecipients(req, res, next) {
+    try {
+      const recipients = await HeadTeacherModule6Service.getNotificationRecipients(req.user.schoolId);
+      return res.json({ success: true, recipients });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async sendNotification(req, res, next) {
+    try {
+      const { title, message, type, recipientMode, targetRoleCode, targetUserIds } = req.body;
+      const data = await HeadTeacherModule6Service.sendNotification({
+        user: req.user,
+        title,
+        message,
+        type,
+        recipientMode,
+        targetRoleCode,
+        targetUserIds
+      });
+      return res.status(201).json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSentNotificationsHistory(req, res, next) {
+    try {
+      const { page, limit } = req.query;
+      const data = await HeadTeacherModule6Service.getSentNotificationsHistory({
+        schoolId: req.user.schoolId,
+        page,
+        limit
+      });
+      return res.json({ success: true, ...data });
     } catch (error) {
       next(error);
     }

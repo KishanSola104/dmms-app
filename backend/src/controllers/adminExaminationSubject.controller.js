@@ -1,4 +1,5 @@
 const ExaminationSubjectService = require('../services/examinationSubject.service');
+const AuditLogService = require('../services/auditLog.service');
 
 class AdminExaminationSubjectController {
   /**
@@ -46,6 +47,21 @@ class AdminExaminationSubjectController {
           components
         }
       );
+
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId,
+        examinationRef: examinationId,
+        classRef: classId,
+        subjectRef: subjectId,
+        module: 'EXAMINATIONS',
+        entityType: 'ExaminationSubjectInfo',
+        entityId: `${examinationId}_${classId}_${subjectId}`,
+        action: 'EXAM_SUBJECT_CONFIGURED',
+        details: `Configured assessment components for examination subject (${components?.length || 0} components)`,
+        newValue: { components },
+        user: req.user
+      });
 
       return res.status(200).json({
         success: true,

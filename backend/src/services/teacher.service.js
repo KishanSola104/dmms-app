@@ -95,8 +95,23 @@ class TeacherService {
           pendingMarksEntry: 0,
           submittedMarks: 0,
           pendingMarksVerification: 0,
-          generatedExaminationResults: 0
+          generatedExaminationResults: 0,
+          totalAssignedTasks: 0,
+          completedTasks: 0,
+          pendingTasks: 0,
+          submittedTasks: 0,
+          returnedTasks: 0,
+          lockedTasks: 0
         },
+        pendingWorkSummary: {
+          totalAssignedTasks: 0,
+          completedTasks: 0,
+          pendingTasks: 0,
+          submittedTasks: 0,
+          returnedTasks: 0,
+          lockedTasks: 0
+        },
+        pendingTasks: [],
         teachingAssignments: [],
         classTeacherSections,
         upcomingExaminations: [],
@@ -191,13 +206,121 @@ class TeacherService {
 
     const extraAllocSet = new Set(extraAllocations.map(a => `${a.classRef.toString()}_${a.subjectRef.toString()}`));
 
-    // Compute Marks Entry Progress for teacher's assigned subjects
+    // Compute Marks Entry Progress & Pending Work for teacher's assigned subjects
+    const resultConfig = await SchoolResultConfigService.getOrCreateConfig(schoolId);
+    const isSeparateCoCurricFinal = resultConfig?.coCurricularConfig?.finalWorkflow === 'SEPARATE_SUBMISSION';
+
+    let totalAssignedTasks = 0;
     let pendingCount = 0;
     let draftCount = 0;
     let returnedCount = 0;
     let submittedCount = 0;
     let verifiedCount = 0;
+    let lockedCount = 0;
     const progressItems = [];
+    const pendingWorkItems = [];
+
+    const resolveEffectiveStatus = (sub) => {
+      if (!sub) return 'PENDING';
+      if (sub.status === 'DRAFT' && sub.enteredCount === 0 && !sub.lastEnteredBy) return 'PENDING';
+      return sub.status;
+    };
+
+    const buildTaskRoute = ({ entryType, examId, classId, sectionId, subjectId }) => {
+      const qs = new URLSearchParams({
+        academicYearId: ayId.toString(),
+        classId: classId.toString(),
+        sectionId: sectionId.toString(),
+        subjectId: subjectId.toString()
+      });
+      if (examId) qs.set('examinationId', examId.toString());
+      if (entryType === 'EXTRA_COMPONENT') {
+        return `/teacher/extra-components?${qs.toString()}`;
+      }
+      if (entryType === 'CO_CURRICULAR_TERM' || entryType === 'CO_CURRICULAR_FINAL') {
+        qs.set('entryType', entryType);
+        return `/teacher/co-curricular-grades?${qs.toString()}`;
+      }
+      return `/teacher/marks-entry?${qs.toString()}`;
+    };
+
+    const recordTask = ({
+      ex = null,
+      assign,
+      entryType,
+      marksEntryType,
+      sub
+    }) => {
+      totalAssignedTasks++;
+      const status = resolveEffectiveStatus(sub);
+      const isLocked = Boolean(sub?.isLocked);
+
+      if (isLocked) lockedCount++;
+      if (status === 'PENDING') pendingCount++;
+      else if (status === 'DRAFT') draftCount++;
+      else if (status === 'RETURNED') returnedCount++;
+      else if (status === 'SUBMITTED') submittedCount++;
+      else if (status === 'VERIFIED') verifiedCount++;
+
+      const examName = ex
+        ? ex.examinationName
+        : (entryType === 'EXTRA_COMPONENT' ? 'Extra / Project Component' : 'Final Co-curricular Grade');
+      const examCode = ex
+        ? ex.examinationCode
+        : (entryType === 'EXTRA_COMPONENT' ? 'PROJECT' : 'FINAL_CC');
+
+      progressItems.push({
+        examinationId: ex ? ex._id : null,
+        examinationName: examName,
+        examinationCode: examCode,
+        className: assign.className,
+        sectionName: assign.sectionName,
+        subjectName: assign.subjectName,
+        subjectType: assign.subjectType,
+        entryType,
+        marksEntryType,
+        status,
+        isLocked,
+        returnReason: sub?.returnReason || ''
+      });
+
+      // Pending Work List excludes completed/submitted tasks and locked tasks
+      if (!isLocked && ['PENDING', 'DRAFT', 'RETURNED'].includes(status)) {
+        pendingWorkItems.push({
+          academicYearId: ayId,
+          academicYearName: selectedYear.yearName || selectedYear.yearCode,
+          examinationId: ex ? ex._id : null,
+          examinationName: examName,
+          examinationCode: examCode,
+          classId: assign.classRef,
+          className: assign.className,
+          sectionId: assign.sectionRef,
+          sectionName: assign.sectionName,
+          subjectId: assign.subjectRef,
+          subjectName: assign.subjectName,
+          subjectCode: assign.subjectCode,
+          marksEntryType,
+          entryType,
+          submissionStatus: status,
+          isLocked: false,
+          availabilityStatus: 'OPEN',
+          pendingAction:
+            status === 'RETURNED'
+              ? 'Fix Returned Marks'
+              : status === 'DRAFT'
+              ? 'Complete Draft'
+              : 'Enter Marks',
+          returnReason: sub?.returnReason || '',
+          targetRoute: buildTaskRoute({
+            entryType,
+            examId: ex ? ex._id : null,
+            classId: assign.classRef,
+            sectionId: assign.sectionRef,
+            subjectId: assign.subjectRef
+          })
+        });
+      }
+    };
 
     for (const assign of subjectAssignments) {
       for (const ex of examsInYear) {
@@ -206,54 +329,46 @@ class TeacherService {
 
         const entryType = assign.subjectType === 'CO_CURRICULAR' ? 'CO_CURRICULAR_TERM' : 'EXAM_ACADEMIC';
         const subKey = `${ex._id.toString()}_${assign.classRef.toString()}_${assign.sectionRef.toString()}_${assign.subjectRef.toString()}_${entryType}`;
-        const sub = submissionMap.get(subKey);
-        const status = sub ? sub.status : 'PENDING';
-
-        if (status === 'PENDING') pendingCount++;
-        else if (status === 'DRAFT') draftCount++;
-        else if (status === 'RETURNED') returnedCount++;
-        else if (status === 'SUBMITTED') submittedCount++;
-        else if (status === 'VERIFIED') verifiedCount++;
-
-        progressItems.push({
-          examinationId: ex._id,
-          examinationName: ex.examinationName,
-          examinationCode: ex.examinationCode,
-          className: assign.className,
-          sectionName: assign.sectionName,
-          subjectName: assign.subjectName,
-          subjectType: assign.subjectType,
+        recordTask({
+          ex,
+          assign,
           entryType,
-          status,
-          returnReason: sub?.returnReason || ''
+          marksEntryType: assign.subjectType === 'CO_CURRICULAR' ? 'Co-curricular Grades' : 'Academic Subject Marks',
+          sub: submissionMap.get(subKey)
         });
       }
 
       // Check extra component task if configured for this class+subject
       if (extraAllocSet.has(`${assign.classRef.toString()}_${assign.subjectRef.toString()}`)) {
         const extraKey = `NULL_${assign.classRef.toString()}_${assign.sectionRef.toString()}_${assign.subjectRef.toString()}_EXTRA_COMPONENT`;
-        const sub = submissionMap.get(extraKey);
-        const status = sub ? sub.status : 'PENDING';
-        if (status === 'PENDING') pendingCount++;
-        else if (status === 'DRAFT') draftCount++;
-        else if (status === 'RETURNED') returnedCount++;
-        else if (status === 'SUBMITTED') submittedCount++;
-        else if (status === 'VERIFIED') verifiedCount++;
-
-        progressItems.push({
-          examinationId: null,
-          examinationName: 'Extra / Project Component',
-          examinationCode: 'PROJECT',
-          className: assign.className,
-          sectionName: assign.sectionName,
-          subjectName: assign.subjectName,
-          subjectType: assign.subjectType,
+        recordTask({
+          ex: null,
+          assign,
           entryType: 'EXTRA_COMPONENT',
-          status,
-          returnReason: sub?.returnReason || ''
+          marksEntryType: 'Extra Component Marks',
+          sub: submissionMap.get(extraKey)
         });
       }
+
+      // Check Final Co-curricular task if Option B is enabled or requested
+      if (assign.subjectType === 'CO_CURRICULAR') {
+        const ccFinalKey = `NULL_${assign.classRef.toString()}_${assign.sectionRef.toString()}_${assign.subjectRef.toString()}_CO_CURRICULAR_FINAL`;
+        const ccFinalSub = submissionMap.get(ccFinalKey);
+        if (isSeparateCoCurricFinal || ccFinalSub) {
+          recordTask({
+            ex: null,
+            assign,
+            entryType: 'CO_CURRICULAR_FINAL',
+            marksEntryType: 'Co-curricular Grades',
+            sub: ccFinalSub
+          });
+        }
+      }
     }
+
+    // Prioritize Returned tasks first, then Draft, then Pending
+    const priorityRank = { RETURNED: 0, DRAFT: 1, PENDING: 2 };
+    pendingWorkItems.sort((a, b) => (priorityRank[a.submissionStatus] ?? 9) - (priorityRank[b.submissionStatus] ?? 9));
 
     // Class Teacher verification & generated result counts
     let pendingMarksVerification = 0;
@@ -318,11 +433,26 @@ class TeacherService {
       summaryCards: {
         totalAssignedClassesSections: classSectionKeys.size,
         totalAssignedSubjects: uniqueSubjectIds.size,
-        pendingMarksEntry: pendingCount + draftCount + returnedCount,
+        pendingMarksEntry: pendingWorkItems.length,
         submittedMarks: submittedCount + verifiedCount,
         pendingMarksVerification,
-        generatedExaminationResults
+        generatedExaminationResults,
+        totalAssignedTasks,
+        completedTasks: verifiedCount,
+        pendingTasks: pendingWorkItems.length,
+        submittedTasks: submittedCount,
+        returnedTasks: pendingWorkItems.filter(t => t.submissionStatus === 'RETURNED').length,
+        lockedTasks: lockedCount
       },
+      pendingWorkSummary: {
+        totalAssignedTasks,
+        completedTasks: verifiedCount,
+        pendingTasks: pendingWorkItems.length,
+        submittedTasks: submittedCount,
+        returnedTasks: pendingWorkItems.filter(t => t.submissionStatus === 'RETURNED').length,
+        lockedTasks: lockedCount
+      },
+      pendingTasks: pendingWorkItems,
       teachingAssignments: subjectAssignments.map(a => ({
         _id: a._id,
         classRef: a.classRef,
@@ -352,6 +482,7 @@ class TeacherService {
         returned: returnedCount,
         submitted: submittedCount,
         verified: verifiedCount,
+        locked: lockedCount,
         items: progressItems.slice(0, 15)
       },
       recentActivities: recentActivities.map(act => ({

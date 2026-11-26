@@ -156,24 +156,24 @@ const DashboardPage = () => {
           <div className="py-12 flex justify-center items-center">
             <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {statsData?.stats?.map((stat, i) => {
-              const style = getColorClasses(stat.color);
-              return (
-                <div key={i} className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${style.bg} ${style.text} ring-4 ${style.ring}`}>
-                    {renderIcon(stat.icon)}
+        ) : Array.isArray(statsData?.stats) ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {statsData.stats.map((stat, i) => {
+                const style = getColorClasses(stat.color);
+                return (
+                  <div key={i} className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200 flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${style.bg} ${style.text} ring-4 ${style.ring}`}>
+                      {renderIcon(stat.icon)}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.title}</p>
+                      <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">{stat.value}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{stat.title}</p>
-                    <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5">{stat.value}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+        ) : null}
 
         {/* ROLE 1: SCHOOL ADMINISTRATOR SPECIFIC CONTENT */}
         {currentUser?.roleCode === 'ADMIN' && (
@@ -374,42 +374,131 @@ const DashboardPage = () => {
 
         {/* ROLE 4: OFFICE STAFF SPECIFIC CONTENT */}
         {currentUser?.roleCode === 'OFFICE_STAFF' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-8 bg-white rounded-2xl shadow-xs border border-slate-200 p-6">
-              <h2 className="text-base font-bold text-slate-900 mb-4 flex items-center space-x-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                <span>Administrative Tasks &amp; Enrollment Oversight</span>
-              </h2>
-
-              <div className="space-y-3">
-                {statsData?.administrativeTasks?.map((task, i) => (
-                  <div key={i} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
-                    <div>
-                      <p className="font-bold text-slate-800">{task.task}</p>
-                      <p className="text-slate-500 mt-0.5">Priority: <span className="font-medium text-blue-600">{task.priority}</span></p>
-                    </div>
-                    <span className="font-medium text-slate-700 bg-white px-2.5 py-1 rounded border border-slate-200">
-                      {task.status}
-                    </span>
-                  </div>
-                ))}
+          <div className="space-y-6">
+            {/* Live Office KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Published Final Results</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{statsData?.stats?.totalPublishedFinalResults ?? 0}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Published Exam Results</p>
+                <p className="text-2xl font-bold text-indigo-700 mt-1">{statsData?.stats?.totalPublishedExamResults ?? 0}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Available Reports</p>
+                <p className="text-2xl font-bold text-emerald-700 mt-1">{statsData?.stats?.availableAcademicReportsCount ?? 0}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">My Total Downloads</p>
+                <p className="text-2xl font-bold text-blue-700 mt-1">{statsData?.stats?.myTotalDownloads ?? 0}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Unread Notifications</p>
+                <p className="text-2xl font-bold text-amber-600 mt-1">{statsData?.stats?.unreadNotifications ?? 0}</p>
               </div>
             </div>
 
-            <div className="lg:col-span-4 bg-white rounded-2xl shadow-xs border border-slate-200 p-6">
-              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">
-                Office Shortcuts
-              </h3>
-              <div className="space-y-2.5">
-                <Link to="/office/published-results" className="block p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800">
-                  Published Results &amp; Marksheets
-                </Link>
-                <Link to="/profile" className="block p-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-xs font-semibold text-slate-700">
-                  Update My Profile
-                </Link>
-                <Link to="/change-password" className="block p-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-xs font-semibold text-slate-700">
-                  Change Account Password
-                </Link>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Recently Published Results */}
+              <div className="lg:col-span-7 bg-white rounded-2xl shadow-xs border border-slate-200 p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-slate-900 flex items-center space-x-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                    <span>Recently Published Results</span>
+                  </h2>
+                  <Link to="/office/published-results" className="text-xs font-semibold text-blue-600 hover:underline">
+                    View All &rarr;
+                  </Link>
+                </div>
+
+                {(statsData?.recentlyPublishedResults || []).length === 0 ? (
+                  <p className="text-xs text-slate-500 py-6 text-center bg-slate-50 rounded-xl">
+                    No officially published results recorded for this academic year yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {statsData.recentlyPublishedResults.map((b) => (
+                      <div key={b.key} className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                        <div>
+                          <p className="font-bold text-slate-900">{b.title} — {b.className} ({b.sectionName})</p>
+                          <p className="text-slate-500 mt-0.5">
+                            Students: <strong>{b.studentCount}</strong> &bull; Passed: <strong className="text-emerald-700">{b.passCount}</strong>
+                          </p>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-full font-semibold border ${
+                          b.type === 'FINAL'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                          {b.type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">Recent Downloads</h3>
+                    <Link to="/office/download-history" className="text-xs font-semibold text-blue-600 hover:underline">
+                      Download History &rarr;
+                    </Link>
+                  </div>
+                  {(statsData?.recentDownloads || []).length === 0 ? (
+                    <p className="text-xs text-slate-400">No recent downloads recorded.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {statsData.recentDownloads.slice(0, 4).map((d) => (
+                        <div key={d._id} className="flex items-center justify-between text-xs py-1.5 px-2.5 bg-slate-50 rounded-lg">
+                          <span className="font-medium text-slate-800 truncate max-w-xs">{d.documentName}</span>
+                          <span className="text-[11px] text-slate-500 shrink-0">
+                            {d.downloadedAt ? new Date(d.downloadedAt).toLocaleDateString('en-GB') : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Notifications & Shortcuts */}
+              <div className="lg:col-span-5 space-y-6">
+                <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Recent Notifications</h3>
+                    <Link to="/office/notifications" className="text-xs font-semibold text-blue-600 hover:underline">
+                      Inbox &rarr;
+                    </Link>
+                  </div>
+                  {(statsData?.notifications || []).length === 0 ? (
+                    <p className="text-xs text-slate-500 py-4">No notifications received yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {statsData.notifications.slice(0, 4).map((n) => (
+                        <div key={n._id} className={`p-3 rounded-xl border text-xs ${n.isRead ? 'bg-slate-50 border-slate-200' : 'bg-blue-50/70 border-blue-200'}`}>
+                          <p className="font-bold text-slate-900">{n.title}</p>
+                          <p className="text-slate-600 mt-0.5 line-clamp-2">{n.message}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-6">
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Quick Shortcuts</h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    <Link to="/office/published-results" className="block p-3 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800">
+                      Published Results &amp; Marksheets
+                    </Link>
+                    <Link to="/office/academic-reports" className="block p-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-semibold text-indigo-800">
+                      Published Academic Reports (PDF)
+                    </Link>
+                    <Link to="/office/download-history" className="block p-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-xs font-semibold text-slate-700">
+                      My Download History
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

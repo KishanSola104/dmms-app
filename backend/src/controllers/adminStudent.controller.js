@@ -1,4 +1,5 @@
 const StudentService = require('../services/student.service');
+const AuditLogService = require('../services/auditLog.service');
 
 class AdminStudentController {
   /**
@@ -67,6 +68,21 @@ class AdminStudentController {
         userId,
         req.body
       );
+
+      await AuditLogService.log({
+        schoolRef,
+        schoolId,
+        academicYearRef: result.enrollment?.academicYearRef || null,
+        classRef: result.enrollment?.classRef || null,
+        sectionRef: result.enrollment?.sectionRef || null,
+        module: 'STUDENTS',
+        entityType: 'StudentInfo',
+        entityId: result.student.admissionNumber,
+        action: 'STUDENT_ADMITTED',
+        details: `Admitted student '${result.student.firstName} ${result.student.lastName}' (${result.student.admissionNumber})`,
+        newValue: { admissionNumber: result.student.admissionNumber, name: `${result.student.firstName} ${result.student.lastName}` },
+        user: req.user
+      });
 
       return res.status(201).json({
         success: true,
@@ -185,6 +201,17 @@ class AdminStudentController {
         req.body
       );
 
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId,
+        module: 'STUDENTS',
+        entityType: 'StudentInfo',
+        entityId: updated.admissionNumber || studentId,
+        action: 'STUDENT_UPDATED',
+        details: `Updated student '${updated.firstName} ${updated.lastName}' (${updated.admissionNumber || studentId})`,
+        user: req.user
+      });
+
       return res.status(200).json({
         success: true,
         message: `Student '${updated.firstName} ${updated.lastName}' details updated successfully.`,
@@ -217,6 +244,18 @@ class AdminStudentController {
         studentId,
         status
       );
+
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId,
+        module: 'STUDENTS',
+        entityType: 'StudentInfo',
+        entityId: result.admissionNumber || studentId,
+        action: 'STUDENT_STATUS_UPDATED',
+        details: `Updated student '${result.admissionNumber || studentId}' status to ${result.status}`,
+        newValue: { status: result.status },
+        user: req.user
+      });
 
       return res.status(200).json({
         success: true,
@@ -313,6 +352,20 @@ class AdminStudentController {
         remarks
       });
 
+      await AuditLogService.log({
+        schoolRef,
+        schoolId,
+        academicYearRef: academicYearRef || academicYearId || null,
+        classRef: classRef || classId || null,
+        sectionRef: sectionRef || sectionId || null,
+        module: 'STUDENTS',
+        entityType: 'StudentEnrollmentInfo',
+        entityId: result.enrollment?._id?.toString() || studentId,
+        action: 'STUDENT_ENROLLED',
+        details: `Enrolled student '${studentId}' into ${result.enrollment?.className || ''} - ${result.enrollment?.sectionName || ''}`,
+        user: req.user
+      });
+
       return res.status(201).json({
         success: true,
         message: 'Student enrolled successfully.',
@@ -370,6 +423,21 @@ class AdminStudentController {
         newSectionRef: newSectionRef || newSectionId,
         newRollNumber,
         remarks
+      });
+
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId,
+        academicYearRef: result.enrollment?.academicYearRef || null,
+        classRef: result.enrollment?.classRef || null,
+        sectionRef: result.enrollment?.sectionRef || null,
+        module: 'STUDENTS',
+        entityType: 'StudentEnrollmentInfo',
+        entityId: enrollmentId,
+        action: 'STUDENT_TRANSFERRED',
+        details: `Transferred student to ${result.enrollment.className} - ${result.enrollment.sectionName}`,
+        newValue: { className: result.enrollment.className, sectionName: result.enrollment.sectionName, rollNumber: result.enrollment.rollNumber },
+        user: req.user
       });
 
       return res.status(200).json({
@@ -477,6 +545,19 @@ class AdminStudentController {
         previousAcademicYearRef: previousAcademicYearRef || previousAcademicYearId,
         nextAcademicYearRef: nextAcademicYearRef || nextAcademicYearId,
         promotions
+      });
+
+      await AuditLogService.log({
+        schoolRef,
+        schoolId,
+        academicYearRef: nextAcademicYearRef || nextAcademicYearId || null,
+        module: 'STUDENTS',
+        entityType: 'StudentPromotion',
+        entityId: String(nextAcademicYearRef || nextAcademicYearId || ''),
+        action: 'STUDENTS_PROMOTED',
+        details: `Executed student promotions (${result.successful} successful, ${result.failed} failed)`,
+        newValue: { successful: result.successful, failed: result.failed },
+        user: req.user
       });
 
       return res.status(200).json({

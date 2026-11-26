@@ -20,7 +20,8 @@ import {
   BookOpen,
   UserCheck,
   Search,
-  Filter
+  Filter,
+  UserMinus
 } from 'lucide-react';
 
 const TeacherAssignmentPage = () => {
@@ -72,8 +73,7 @@ const TeacherAssignmentPage = () => {
   const [reassignSubmitting, setReassignSubmitting] = useState(false);
   const [reassignError, setReassignError] = useState('');
 
-  // Toggle status loading
-  const [togglingId, setTogglingId] = useState(null);
+  
 
   // 1. Initial Load: Classes and Teachers
   useEffect(() => {
@@ -298,6 +298,31 @@ const TeacherAssignmentPage = () => {
     }
   };
 
+  const [deallocateTarget, setDeallocateTarget] = useState(null);
+  const [deallocating, setDeallocating] = useState(false);
+
+  const handleConfirmDeallocate = async () => {
+    if (!deallocateTarget) return;
+    setDeallocating(true);
+    try {
+      const res = await api.post(`/admin/teacher-assignments/${deallocateTarget._id}/deallocate`, {
+        reason: 'Deallocated via Teacher Assignment Console'
+      });
+      if (res.success) {
+        setAlert({
+          type: 'success',
+          message: res.message || 'Teacher assignment deallocated. Historical marks and results have been preserved.'
+        });
+        setDeallocateTarget(null);
+        fetchAssignments(pagination.currentPage);
+      }
+    } catch (err) {
+      setAlert({ type: 'error', message: err.message || 'Failed to deallocate teacher assignment.' });
+    } finally {
+      setDeallocating(false);
+    }
+  };
+
   // Status toggle
   const handleToggleStatus = async (assignment) => {
     const nextStatus = assignment.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -422,6 +447,16 @@ const TeacherAssignmentPage = () => {
               <CheckCircle className="w-4 h-4 text-emerald-500" />
             )}
           </button>
+          {item.status === 'ACTIVE' && (
+            <button
+              type="button"
+              onClick={() => setDeallocateTarget(item)}
+              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+              title="Deallocate Teacher (Preserves Historical Marks)"
+            >
+              <UserMinus className="w-4 h-4 text-rose-500" />
+            </button>
+          )}
         </div>
       )
     }
@@ -827,6 +862,48 @@ const TeacherAssignmentPage = () => {
               </button>
             </div>
           </form>
+        </AdminModal>
+
+        {/* Deallocate Assignment Confirmation Modal */}
+        <AdminModal
+          isOpen={!!deallocateTarget}
+          onClose={() => !deallocating && setDeallocateTarget(null)}
+          title="Confirm Teacher Deallocation"
+        >
+          {deallocateTarget && (
+            <div className="space-y-4 text-xs">
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 space-y-1">
+                <p className="font-bold">Remove Future Subject Assignment</p>
+                <p>
+                  You are about to deallocate <strong>{deallocateTarget.teacherName}</strong> from{' '}
+                  <strong>{deallocateTarget.subjectName}</strong> in{' '}
+                  <strong>{deallocateTarget.className} - Section {deallocateTarget.sectionCode}</strong>.
+                </p>
+                <p className="font-semibold text-emerald-800 pt-1">
+                  All previously submitted marks and generated results will remain permanently intact.
+                </p>
+              </div>
+              <div className="flex justify-end space-x-3 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  disabled={deallocating}
+                  onClick={() => setDeallocateTarget(null)}
+                  className="px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={deallocating}
+                  onClick={handleConfirmDeallocate}
+                  className="inline-flex items-center px-4 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg disabled:opacity-50"
+                >
+                  {deallocating ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+                  Confirm Deallocate
+                </button>
+              </div>
+            </div>
+          )}
         </AdminModal>
       </div>
     </DashboardLayout>

@@ -1,4 +1,5 @@
 const StudentImportExportService = require('../services/studentImportExport.service');
+const AuditLogService = require('../services/auditLog.service');
 
 class AdminStudentImportExportController {
   /**
@@ -74,6 +75,19 @@ class AdminStudentImportExportController {
         importType,
         fileName,
         validRows
+      });
+
+      await AuditLogService.log({
+        schoolRef,
+        schoolId,
+        academicYearRef: academicYearRef || academicYearId || null,
+        module: 'STUDENTS',
+        entityType: 'StudentImportBatchInfo',
+        entityId: fileName || 'excel-import',
+        action: 'STUDENTS_IMPORTED',
+        details: `Imported students from '${fileName || 'Excel'}': ${result.successfulRecords} created, ${result.failedRecords} failed`,
+        newValue: { successfulRecords: result.successfulRecords, failedRecords: result.failedRecords },
+        user: req.user
       });
 
       return res.status(201).json({

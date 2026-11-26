@@ -49,31 +49,37 @@ const marksAuditLogInfoSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: [
-      'MARKS_SAVED_DRAFT',
-      'MARKS_SUBMITTED',
-      'MARKS_RETURNED',
-      'MARKS_RESUBMITTED',
-      'MARKS_VERIFIED',
-      'CO_CURRICULAR_FINAL_REQUESTED',
-      'EXAM_RESULT_GENERATED',
-      'EXAM_RESULT_SUBMITTED',
-      'EXAM_RESULT_UNDER_REVIEW',
-      'EXAM_RESULT_RETURNED',
-      'EXAM_RESULT_APPROVED',
-      'EXAM_RESULT_PUBLISHED',
-      'FINAL_RESULT_GENERATED',
-      'FINAL_RESULT_SUBMITTED',
-      'FINAL_RESULT_UNDER_REVIEW',
-      'FINAL_RESULT_RETURNED',
-      'FINAL_RESULT_APPROVED',
-      'FINAL_RESULT_PUBLISHED'
-    ]
+    trim: true,
+    uppercase: true
+  },
+  module: {
+    type: String,
+    trim: true,
+    uppercase: true,
+    default: 'MARKS_ENTRY'
+  },
+  entityType: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  entityId: {
+    type: String,
+    trim: true,
+    default: ''
   },
   details: {
     type: String,
     trim: true,
     default: ''
+  },
+  previousValue: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
+  },
+  newValue: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
   },
   performedByUserRef: {
     type: mongoose.Schema.Types.ObjectId,
@@ -101,5 +107,7 @@ const marksAuditLogInfoSchema = new mongoose.Schema({
 
 marksAuditLogInfoSchema.index({ schoolId: 1, academicYearRef: 1, performedAt: -1 });
 marksAuditLogInfoSchema.index({ schoolId: 1, submissionRef: 1, performedAt: -1 });
+marksAuditLogInfoSchema.index({ schoolId: 1, module: 1, performedAt: -1 });
+marksAuditLogInfoSchema.index({ schoolId: 1, performedByRole: 1, performedAt: -1 });
 
 module.exports = mongoose.model('MarksAuditLogInfo', marksAuditLogInfoSchema);

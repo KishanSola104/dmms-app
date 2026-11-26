@@ -9,5 +9,7 @@ router.get('/notifications', verifyUserAuth, CommonController.getNotifications);
 router.put('/notifications/:id/read', verifyUserAuth, CommonController.markNotificationRead);
 router.put('/notifications/mark-all-read', verifyUserAuth, CommonController.markAllNotificationsRead);
 router.get('/dashboard-stats', verifyUserAuth, CommonController.getDashboardStats);
+router.get('/restart-status', verifyUserAuth, CommonController.getRestartStatus);
+router.post('/restart-application', verifyUserAuth, CommonController.restartApplication);
 
 module.exports = router;

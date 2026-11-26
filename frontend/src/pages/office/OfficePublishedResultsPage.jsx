@@ -121,7 +121,7 @@ const OfficePublishedResultsPage = () => {
 
   const handlePreviewStudentPdf = async (row) => {
     try {
-      const url = `/api/office/published-results/${row._id}/pdf?type=${resultType}`;
+      const url = `/api/office/published-results/${row._id}/pdf?type=${resultType}&preview=true`;
       const blob = await fetchPdfBlob(url);
       const blobUrl = URL.createObjectURL(blob);
       setPdfMeta({

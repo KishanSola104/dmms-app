@@ -626,9 +626,13 @@ const HeadTeacherStudentPerformancePage = () => {
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-1">
-                <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Published Results</div>
-                <div className="text-2xl font-bold text-blue-600">0</div>
-                <div className="text-[11px] text-slate-500">Official approved results</div>
+                <div className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Approved / Published</div>
+                <div className="text-2xl font-bold text-blue-600">{performanceData?.summary?.publishedResults ?? 0}</div>
+                <div className="text-[11px] text-slate-500">
+                  {performanceData?.summary?.averagePercentage != null
+                    ? `Avg: ${performanceData.summary.averagePercentage}%`
+                    : 'Exam results generated/published'}
+                </div>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-1">
@@ -710,13 +714,23 @@ const HeadTeacherStudentPerformancePage = () => {
                             </div>
                           </div>
 
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2">
                             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                               {exam.status}
                             </span>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                              Results: Unpublished
-                            </span>
+                            {exam.examResultSummary ? (
+                              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                                ['APPROVED', 'PUBLISHED'].includes(exam.examResultSummary.status)
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-blue-50 text-blue-700 border-blue-200'
+                              }`}>
+                                {exam.examResultSummary.percentage}% ({exam.examResultSummary.overallGrade}) &bull; {exam.examResultSummary.status}
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                Result Pending
+                              </span>
+                            )}
                             {isSelected ? (
                               <ChevronDown className="w-4 h-4 text-slate-400" />
                             ) : (
@@ -729,10 +743,12 @@ const HeadTeacherStudentPerformancePage = () => {
                         {isSelected && (
                           <div className="mt-4 pt-4 border-t border-slate-100 space-y-3 animate-in fade-in duration-100">
                             <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                              <span>Subject-Wise Assessment Configuration</span>
-                              <span className="text-[11px] text-slate-400 font-normal">
-                                Assessment criteria defined in examination setup
-                              </span>
+                              <span>Subject-Wise Marks &amp; Component Breakdown</span>
+                              {exam.examResultSummary && (
+                                <span className="text-xs font-semibold text-indigo-700">
+                                  Total: {exam.examResultSummary.totalMarksObtained}/{exam.examResultSummary.totalMaximumMarks} ({exam.examResultSummary.resultStatus})
+                                </span>
+                              )}
                             </div>
 
                             <div className="overflow-x-auto border border-slate-200 rounded-xl">
@@ -742,8 +758,8 @@ const HeadTeacherStudentPerformancePage = () => {
                                     <th className="py-2.5 px-3">Subject Name</th>
                                     <th className="py-2.5 px-3">Type</th>
                                     <th className="py-2.5 px-3">Max Marks</th>
-                                    <th className="py-2.5 px-3">Configured Components</th>
-                                    <th className="py-2.5 px-3">Marks Obtained</th>
+                                    <th className="py-2.5 px-3">Components</th>
+                                    <th className="py-2.5 px-3">Obtained / Grade</th>
                                     <th className="py-2.5 px-3">Status</th>
                                   </tr>
                                 </thead>
@@ -783,7 +799,10 @@ const HeadTeacherStudentPerformancePage = () => {
                                                   key={c._id}
                                                   className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-slate-100 text-slate-700 border border-slate-200"
                                                 >
-                                                  {c.componentName}: <strong>{c.maximumMarks}M</strong>
+                                                  {c.componentName}:{' '}
+                                                  <strong className="ml-0.5">
+                                                    {c.marksObtained != null ? `${c.marksObtained}/${c.maximumMarks}` : `${c.maximumMarks}M`}
+                                                  </strong>
                                                 </span>
                                               ))}
                                             </div>
@@ -791,12 +810,22 @@ const HeadTeacherStudentPerformancePage = () => {
                                             <span className="text-slate-400 italic">No sub-components</span>
                                           )}
                                         </td>
-                                        <td className="py-2.5 px-3 text-slate-400 italic">
-                                          Pending publication
+                                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                                          {sub.subjectType === 'CO_CURRICULAR'
+                                            ? (sub.grade ? `Grade: ${sub.grade}` : <span className="text-slate-400 font-normal italic">Pending</span>)
+                                            : sub.marksObtained != null
+                                            ? `${sub.marksObtained}/${sub.totalMaximumMarks}${sub.grade ? ` (${sub.grade})` : ''}`
+                                            : <span className="text-slate-400 font-normal italic">Pending</span>}
                                         </td>
                                         <td className="py-2.5 px-3">
-                                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                                            Scheduled
+                                          <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                                            sub.entryStatus === 'PUBLISHED'
+                                              ? 'bg-emerald-50 text-emerald-700'
+                                              : sub.entryStatus === 'PENDING'
+                                              ? 'bg-slate-100 text-slate-600'
+                                              : 'bg-blue-50 text-blue-700'
+                                          }`}>
+                                            {sub.entryStatus || 'Scheduled'}
                                           </span>
                                         </td>
                                       </tr>
@@ -814,13 +843,67 @@ const HeadTeacherStudentPerformancePage = () => {
               )}
             </div>
 
-            {/* Clean Graphical Analytics Placeholder */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs text-center space-y-2">
-              <BarChart3 className="w-8 h-8 text-indigo-400 mx-auto" />
-              <h3 className="text-sm font-bold text-slate-800">Performance Trends</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                No performance data available. Visual score progression and subject comparison charts will appear automatically when published examination results are available.
-              </p>
+            {/* Final Academic Result Summary & Performance Progression */}
+            {performanceData?.finalResult && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <h3 className="text-sm font-bold text-slate-900">Final Academic Result Summary</h3>
+                  <StatusBadge status={performanceData.finalResult.status} />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-500">Total Obtained</span>
+                    <p className="font-bold text-slate-900 text-sm mt-0.5">
+                      {performanceData.finalResult.overallTotalObtained} / {performanceData.finalResult.overallMaxMarks}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-500">Final Percentage</span>
+                    <p className="font-bold text-blue-700 text-sm mt-0.5">{performanceData.finalResult.finalPercentage}%</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-500">Overall Grade</span>
+                    <p className="font-bold text-slate-900 text-sm mt-0.5">{performanceData.finalResult.overallGrade}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-500">Result</span>
+                    <p className="font-bold text-emerald-700 text-sm mt-0.5">{performanceData.finalResult.resultStatus}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl">
+                    <span className="text-slate-500">Promotion</span>
+                    <p className="font-bold text-indigo-700 text-sm mt-0.5">{performanceData.finalResult.promotionStatus}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-sm font-bold text-slate-800">Examination Percentage Trend</h3>
+              </div>
+              {examinations.some(e => e.examResultSummary) ? (
+                <div className="space-y-2.5 pt-1">
+                  {examinations.filter(e => e.examResultSummary).map((e) => (
+                    <div key={e._id} className="space-y-1 text-xs">
+                      <div className="flex justify-between font-semibold text-slate-700">
+                        <span>{e.examinationName}</span>
+                        <span>{e.examResultSummary.percentage}% ({e.examResultSummary.overallGrade})</span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-600 rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(0, Number(e.examResultSummary.percentage) || 0))}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">
+                  No examination results generated yet for this academic session. Score bars will appear once marks are processed into results.
+                </p>
+              )}
             </div>
           </div>
         )}

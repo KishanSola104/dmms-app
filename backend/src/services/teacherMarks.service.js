@@ -16,10 +16,11 @@ const UserInfo = require('../models/userInfo.model');
 const TeacherAccessService = require('./teacherAccess.service');
 const TeacherService = require('./teacher.service');
 const SchoolResultConfigService = require('./schoolResultConfig.service');
+const AuditLogService = require('./auditLog.service');
 
 class TeacherMarksService {
   /**
-   * Helper: Write audit log entry
+   * Helper: Write audit log entry via centralized AuditLogService
    */
   static async logAudit({
     schoolRef,
@@ -31,31 +32,34 @@ class TeacherMarksService {
     subjectRef = null,
     submissionRef = null,
     resultRef = null,
+    module = 'MARKS_ENTRY',
+    entityType = '',
+    entityId = '',
     action,
     details = '',
+    previousValue = null,
+    newValue = null,
     user
   }) {
-    try {
-      await MarksAuditLogInfo.create({
-        schoolRef,
-        schoolId: schoolId.toUpperCase(),
-        academicYearRef,
-        examinationRef,
-        classRef,
-        sectionRef,
-        subjectRef,
-        submissionRef,
-        resultRef,
-        action,
-        details,
-        performedByUserRef: user._id,
-        performedByName: user.employeeRef?.fullName || user.fullName || user.userId,
-        performedByRole: user.roleCode,
-        performedAt: new Date()
-      });
-    } catch (err) {
-      console.warn('[MarksAuditLog] Failed to write audit log:', err.message);
-    }
+    return AuditLogService.log({
+      schoolRef,
+      schoolId,
+      academicYearRef,
+      examinationRef,
+      classRef,
+      sectionRef,
+      subjectRef,
+      submissionRef,
+      resultRef,
+      module,
+      entityType,
+      entityId,
+      action,
+      details,
+      previousValue,
+      newValue,
+      user
+    });
   }
 
   /**
@@ -498,7 +502,7 @@ class TeacherMarksService {
     });
 
     const subStatus = submission ? submission.status : 'DRAFT';
-    const isLocked = ['SUBMITTED', 'VERIFIED'].includes(subStatus);
+    const isLocked = Boolean(submission?.isLocked);
 
     const passingPercentage = config?.passingRules?.passingPercentage ?? 40;
     const passingMarks = Math.ceil((totalMaximumMarks * passingPercentage) / 100);
@@ -534,13 +538,18 @@ class TeacherMarksService {
         ? {
             _id: submission._id,
             status: submission.status,
+            isLocked: Boolean(submission.isLocked),
+            lockedAt: submission.lockedAt || null,
+            lockedByRole: submission.lockedByRole || null,
+            lockReason: submission.lockReason || '',
             submittedAt: submission.submittedAt,
+            updatedAfterSubmissionAt: submission.updatedAfterSubmissionAt || null,
             verifiedAt: submission.verifiedAt,
             returnedAt: submission.returnedAt,
             returnReason: submission.returnReason,
             requestedAt: submission.requestedAt
           }
-        : { status: 'DRAFT', returnReason: '' },
+        : { status: 'DRAFT', isLocked: false, lockReason: '', returnReason: '' },
       isLocked,
       students
     };
@@ -585,7 +594,7 @@ class TeacherMarksService {
 
     if (sheet.isLocked) {
       const err = new Error(
-        `Cannot modify marks because this submission is currently '${sheet.submission.status}'.`
+        `Marks entry is locked${sheet.submission?.lockReason ? ` (${sheet.submission.lockReason})` : ''}. You cannot save or update marks until it is reopened by the Head Teacher or Administrator.`
       );
       err.statusCode = 403;
       throw err;
@@ -748,7 +757,10 @@ class TeacherMarksService {
     const examId = sheet.examination ? sheet.examination._id : null;
     const prevStatus = sheet.submission?.status || 'DRAFT';
     const isResubmission = prevStatus === 'RETURNED' && cleanAction === 'SUBMIT';
-    const nextStatus = cleanAction === 'SUBMIT' ? 'SUBMITTED' : (prevStatus === 'RETURNED' ? 'RETURNED' : 'DRAFT');
+    const isUpdateAfterSubmission = ['SUBMITTED', 'VERIFIED'].includes(prevStatus);
+    const nextStatus = cleanAction === 'SUBMIT'
+      ? 'SUBMITTED'
+      : (prevStatus === 'RETURNED' ? 'RETURNED' : 'DRAFT');
 
     let submission = await MarksSubmissionInfo.findOne({
       schoolId,
@@ -759,6 +771,33 @@ class TeacherMarksService {
       subjectRef: subjectId,
       entryType
     });
+
+    if (submission && submission.isLocked) {
+      const err = new Error('Marks entry is locked. You cannot save or update marks.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Track previous values for audit log when updating submitted/verified/returned marks
+    let changeDiffs = [];
+    if (submission) {
+      const prevEntries = await MarksEntryInfo.find({ submissionRef: submission._id }).lean();
+      const prevByStu = new Map(prevEntries.map(pe => [pe.studentRef.toString(), pe]));
+      const stuNameById = new Map(sheet.students.map(s => [s.studentId.toString(), s.studentName]));
+      for (const row of validatedRows) {
+        const pe = prevByStu.get(row.studentRef.toString());
+        if (!pe) continue;
+        const oldVal = pe.isAbsent ? 'AB' : (isCoCurricular ? (pe.grade || '—') : pe.totalMarksObtained);
+        const newVal = row.isAbsent ? 'AB' : (isCoCurricular ? (row.grade || '—') : row.totalMarksObtained);
+        if (String(oldVal ?? '') !== String(newVal ?? '')) {
+          changeDiffs.push({
+            student: stuNameById.get(row.studentRef.toString()) || row.studentRef.toString(),
+            from: oldVal,
+            to: newVal
+          });
+        }
+      }
+    }
 
     const now = new Date();
     if (!submission) {
@@ -783,6 +822,12 @@ class TeacherMarksService {
       submission.totalStudents = sheet.students.length;
       submission.enteredCount = enteredCount;
       submission.lastEnteredBy = userRef;
+      if (isUpdateAfterSubmission) {
+        // Require Class Teacher re-verification whenever already-submitted/verified marks are modified
+        submission.verifiedBy = null;
+        submission.verifiedAt = null;
+        submission.updatedAfterSubmissionAt = now;
+      }
       if (cleanAction === 'SUBMIT') {
         submission.submittedBy = userRef;
         submission.submittedAt = now;
@@ -834,6 +879,11 @@ class TeacherMarksService {
       ? `${sheet.examination.examinationName} - ${sheet.assignment.subjectName}`
       : `${entryType === 'EXTRA_COMPONENT' ? 'Extra Components' : 'Final Co-curricular'} - ${sheet.assignment.subjectName}`;
 
+    const auditAction =
+      cleanAction === 'SUBMIT'
+        ? (isResubmission ? 'MARKS_RESUBMITTED' : (isUpdateAfterSubmission ? 'MARKS_UPDATED_AFTER_SUBMISSION' : 'MARKS_SUBMITTED'))
+        : (isUpdateAfterSubmission ? 'MARKS_UPDATED_AFTER_SUBMISSION' : 'MARKS_SAVED_DRAFT');
+
     await this.logAudit({
       schoolRef,
       schoolId,
@@ -843,11 +893,13 @@ class TeacherMarksService {
       sectionRef: sectionId,
       subjectRef: subjectId,
       submissionRef: submission._id,
-      action:
-        cleanAction === 'SUBMIT'
-          ? (isResubmission ? 'MARKS_RESUBMITTED' : 'MARKS_SUBMITTED')
-          : 'MARKS_SAVED_DRAFT',
-      details: `${label} (${sheet.assignment.className} - ${sheet.assignment.sectionName}) — ${enteredCount}/${sheet.students.length} students`,
+      module: 'MARKS_ENTRY',
+      entityType: 'MarksSubmissionInfo',
+      entityId: submission._id.toString(),
+      action: auditAction,
+      details: `${label} (${sheet.assignment.className} - ${sheet.assignment.sectionName}) — ${enteredCount}/${sheet.students.length} students${changeDiffs.length ? ` (${changeDiffs.length} updated)` : ''}`,
+      previousValue: changeDiffs.length ? { prevStatus, changes: changeDiffs.slice(0, 20).map(c => ({ student: c.student, value: c.from })) } : { prevStatus },
+      newValue: changeDiffs.length ? { status: nextStatus, changes: changeDiffs.slice(0, 20).map(c => ({ student: c.student, value: c.to })) } : { status: nextStatus, enteredCount },
       user
     });
 
@@ -860,8 +912,12 @@ class TeacherMarksService {
           schoolRef,
           schoolId,
           targetUser: ct,
-          title: isResubmission ? 'Marks Resubmitted for Verification' : 'Marks Submitted for Verification',
-          message: `${teacherName} ${isResubmission ? 'resubmitted' : 'submitted'} ${label} for ${sheet.assignment.className} - ${sheet.assignment.sectionName}.`,
+          title: isResubmission
+            ? 'Marks Resubmitted for Verification'
+            : isUpdateAfterSubmission
+            ? 'Submitted Marks Updated — Re-Verification Needed'
+            : 'Marks Submitted for Verification',
+          message: `${teacherName} ${isResubmission ? 'resubmitted' : (isUpdateAfterSubmission ? 'updated submitted' : 'submitted')} ${label} for ${sheet.assignment.className} - ${sheet.assignment.sectionName}.`,
           type: 'info'
         });
       }
@@ -873,7 +929,11 @@ class TeacherMarksService {
       totalStudents: sheet.students.length,
       message:
         cleanAction === 'SUBMIT'
-          ? (isResubmission ? 'Corrected marks resubmitted for verification.' : 'Marks submitted for verification.')
+          ? (isResubmission
+              ? 'Corrected marks resubmitted for verification.'
+              : isUpdateAfterSubmission
+              ? 'Submitted marks updated successfully. Class Teacher has been notified for review.'
+              : 'Marks submitted for verification. Marks remain editable until locked by Head Teacher or Admin.')
           : 'Draft marks saved successfully.'
     };
   }
@@ -956,6 +1016,10 @@ class TeacherMarksService {
         totalStudents: s.totalStudents,
         marksEntered: s.enteredCount,
         submissionStatus: s.status,
+        isLocked: Boolean(s.isLocked),
+        lockedAt: s.lockedAt || null,
+        lockedByRole: s.lockedByRole || null,
+        lockReason: s.lockReason || '',
         verificationStatus: s.status === 'VERIFIED' ? 'VERIFIED' : s.status === 'RETURNED' ? 'RETURNED' : 'PENDING',
         submittedAt: s.submittedAt,
         verifiedAt: s.verifiedAt,
@@ -1081,6 +1145,10 @@ class TeacherMarksService {
         subjectType: submission.subjectRef.subjectType,
         entryType: submission.entryType,
         status: submission.status,
+        isLocked: Boolean(submission.isLocked),
+        lockedAt: submission.lockedAt || null,
+        lockedByRole: submission.lockedByRole || null,
+        lockReason: submission.lockReason || '',
         totalStudents: submission.totalStudents,
         enteredCount: submission.enteredCount,
         submittedAt: submission.submittedAt,

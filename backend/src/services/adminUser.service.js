@@ -8,6 +8,7 @@ const ConfirmationCode = require('../models/confirmationCode.model');
 const UserIdService = require('./userId.service');
 const PasswordService = require('./password.service');
 const EmailService = require('./email.service');
+const AuditLogService = require('./auditLog.service');
 const bcrypt = require('bcryptjs');
 
 class AdminUserService {
@@ -67,23 +68,30 @@ class AdminUserService {
     const totalRecords = filtered.length;
     const paginated = filtered.slice(skip, skip + limitNum);
 
-    const formatted = paginated.map(u => ({
-      _id: u._id,
-      userId: u.userId,
-      fullName: u.employeeRef?.fullName || 'N/A',
-      email: u.email,
-      mobileNumber: u.employeeRef?.mobileNumber || 'N/A',
-      designation: u.employeeRef?.designation || u.roleName,
-      roleCode: u.roleCode,
-      roleName: u.roleName,
-      roleRef: u.roleRef?._id,
-      employeeRef: u.employeeRef?._id,
-      address: u.employeeRef?.address || '',
-      qualification: u.employeeRef?.qualification || '',
-      status: u.status,
-      isFirstLogin: u.isFirstLogin,
-      createdAt: u.createdAt
-    }));
+    const schoolDoc = await SchoolInfo.findOne({ schoolId }).select('email').lean();
+    const schoolEmailLower = (schoolDoc?.email || '').trim().toLowerCase();
+
+    const formatted = paginated.map(u => {
+      const normalizedUserEmail = (u.email || '').trim().toLowerCase();
+      return {
+        _id: u._id,
+        userId: u.userId,
+        fullName: u.employeeRef?.fullName || 'N/A',
+        email: u.email,
+        mobileNumber: u.employeeRef?.mobileNumber || 'N/A',
+        designation: u.employeeRef?.designation || u.roleName,
+        roleCode: u.roleCode,
+        roleName: u.roleName,
+        roleRef: u.roleRef?._id,
+        employeeRef: u.employeeRef?._id,
+        address: u.employeeRef?.address || '',
+        qualification: u.employeeRef?.qualification || '',
+        status: u.status,
+        isFirstLogin: u.isFirstLogin,
+        hasSchoolEmailConflict: Boolean(schoolEmailLower && normalizedUserEmail === schoolEmailLower),
+        createdAt: u.createdAt
+      };
+    });
 
     return {
       users: formatted,
@@ -121,13 +129,14 @@ class AdminUserService {
   /**
    * Create a new user account
    */
-  static async createUser({ schoolId, schoolRef, schoolCode, schoolName, fullName, email, mobileNumber, designation, roleCode }) {
+  static async createUser({ schoolId, schoolRef, schoolCode, schoolName, fullName, email, mobileNumber, designation, roleCode, adminUser = null }) {
     if (!fullName || !email || !mobileNumber || !roleCode) {
       throw new Error('Full Name, Email, Mobile Number, and Role are mandatory.');
     }
 
+    const cleanEmail = String(email).trim().toLowerCase();
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(cleanEmail)) {
       throw new Error('Please provide a valid email address.');
     }
 
@@ -136,7 +145,13 @@ class AdminUserService {
       throw new Error('Please provide a valid mobile number.');
     }
 
-    const cleanEmail = email.toLowerCase().trim();
+    // Prevent registration using the school's registered email (case-insensitive)
+    const schoolDoc = await SchoolInfo.findOne({ schoolId }).select('email').lean();
+    if (schoolDoc && schoolDoc.email && cleanEmail === schoolDoc.email.trim().toLowerCase()) {
+      throw new Error(
+        `A user cannot be registered using the school's official email address (${schoolDoc.email}). Please provide a distinct user email.`
+      );
+    }
 
     // Check duplicate email within this school
     const existingUser = await UserInfo.findOne({ schoolId, email: cleanEmail });
@@ -206,6 +221,20 @@ class AdminUserService {
       console.error('[AdminUserService] Error sending credentials email:', err.message);
     }
 
+    if (adminUser) {
+      await AuditLogService.log({
+        schoolRef,
+        schoolId,
+        module: 'USERS',
+        entityType: 'UserInfo',
+        entityId: savedUser.userId,
+        action: 'USER_CREATED',
+        details: `Created ${roleDoc.roleName} account '${savedUser.userId}' (${savedEmployee.fullName})`,
+        newValue: { userId: savedUser.userId, fullName: savedEmployee.fullName, email: savedUser.email, roleCode: savedUser.roleCode, status: savedUser.status },
+        user: adminUser
+      });
+    }
+
     return {
       user: {
         userId: savedUser.userId,
@@ -225,7 +254,7 @@ class AdminUserService {
   /**
    * Edit existing user
    */
-  static async editUser({ schoolId, userId, fullName, email, mobileNumber, designation, roleCode, address, qualification }) {
+  static async editUser({ schoolId, userId, fullName, email, mobileNumber, designation, roleCode, address, qualification, adminUser = null }) {
     const user = await UserInfo.findOne({ schoolId, userId }).populate('roleRef');
     if (!user) {
       throw new Error('User not found.');
@@ -236,15 +265,28 @@ class AdminUserService {
       throw new Error('Employee profile not found.');
     }
 
+    const prevSnapshot = {
+      fullName: employee.fullName,
+      email: user.email,
+      mobileNumber: employee.mobileNumber,
+      designation: employee.designation,
+      roleCode: user.roleCode
+    };
+
+    const cleanEmail = email ? String(email).trim().toLowerCase() : user.email;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (email && !emailRegex.test(email)) {
+    if (email && !emailRegex.test(cleanEmail)) {
       throw new Error('Please provide a valid email address.');
     }
 
-    const cleanEmail = email ? email.toLowerCase().trim() : user.email;
-
-    // Check duplicate email if changed
-    if (cleanEmail !== user.email) {
+    // Prevent updating user email to match the school's official registered email
+    if (email && cleanEmail !== user.email) {
+      const schoolDoc = await SchoolInfo.findOne({ schoolId }).select('email').lean();
+      if (schoolDoc && schoolDoc.email && cleanEmail === schoolDoc.email.trim().toLowerCase()) {
+        throw new Error(
+          `A user email cannot match the school's official registered email address (${schoolDoc.email}).`
+        );
+      }
       const duplicate = await UserInfo.findOne({ schoolId, email: cleanEmail, userId: { $ne: userId } });
       if (duplicate) {
         throw new Error(`Another user with email '${cleanEmail}' already exists in this school.`);
@@ -294,6 +336,27 @@ class AdminUserService {
 
     await employee.save();
     await user.save();
+
+    if (adminUser) {
+      await AuditLogService.log({
+        schoolRef: user.schoolRef,
+        schoolId,
+        module: 'USERS',
+        entityType: 'UserInfo',
+        entityId: user.userId,
+        action: 'USER_UPDATED',
+        details: `Updated user account '${user.userId}' (${employee.fullName})`,
+        previousValue: prevSnapshot,
+        newValue: {
+          fullName: employee.fullName,
+          email: user.email,
+          mobileNumber: employee.mobileNumber,
+          designation: employee.designation,
+          roleCode: user.roleCode
+        },
+        user: adminUser
+      });
+    }
 
     return {
       userId: user.userId,
@@ -450,6 +513,19 @@ class AdminUserService {
     targetUser.status = 'INACTIVE';
     await targetUser.save();
 
+    await AuditLogService.log({
+      schoolRef: targetUser.schoolRef,
+      schoolId,
+      module: 'USERS',
+      entityType: 'UserInfo',
+      entityId: targetUser.userId,
+      action: 'USER_DEACTIVATED',
+      details: `Deactivated user account '${targetUserId}' (${targetUser.roleCode})`,
+      previousValue: { status: 'ACTIVE' },
+      newValue: { status: 'INACTIVE' },
+      user: adminUser
+    });
+
     return {
       success: true,
       message: `User account '${targetUserId}' has been deactivated successfully.`
@@ -459,14 +535,30 @@ class AdminUserService {
   /**
    * Activate User
    */
-  static async activateUser({ schoolId, targetUserId }) {
+  static async activateUser({ schoolId, targetUserId, adminUser = null }) {
     const targetUser = await UserInfo.findOne({ schoolId, userId: targetUserId });
     if (!targetUser) {
       throw new Error('User not found.');
     }
 
+    const prevStatus = targetUser.status;
     targetUser.status = 'ACTIVE';
     await targetUser.save();
+
+    if (adminUser) {
+      await AuditLogService.log({
+        schoolRef: targetUser.schoolRef,
+        schoolId,
+        module: 'USERS',
+        entityType: 'UserInfo',
+        entityId: targetUser.userId,
+        action: 'USER_ACTIVATED',
+        details: `Activated user account '${targetUserId}' (${targetUser.roleCode})`,
+        previousValue: { status: prevStatus },
+        newValue: { status: 'ACTIVE' },
+        user: adminUser
+      });
+    }
 
     return {
       success: true,
@@ -521,6 +613,19 @@ class AdminUserService {
     // Safely remove user and employee
     await EmployeeInfo.deleteOne({ _id: targetUser.employeeRef });
     await UserInfo.deleteOne({ _id: targetUser._id });
+
+    await AuditLogService.log({
+      schoolRef: targetUser.schoolRef,
+      schoolId,
+      module: 'USERS',
+      entityType: 'UserInfo',
+      entityId: targetUser.userId,
+      action: 'USER_DELETED',
+      details: `Deleted user account '${targetUserId}' (${targetUser.roleCode})`,
+      previousValue: { userId: targetUser.userId, email: targetUser.email, roleCode: targetUser.roleCode },
+      newValue: null,
+      user: adminUser
+    });
 
     return {
       success: true,

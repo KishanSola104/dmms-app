@@ -39,7 +39,8 @@ class AdminUserController {
         email,
         mobileNumber,
         designation,
-        roleCode
+        roleCode,
+        adminUser: req.user
       });
       return res.status(201).json({
         success: true,
@@ -64,7 +65,8 @@ class AdminUserController {
         designation,
         roleCode,
         address,
-        qualification
+        qualification,
+        adminUser: req.user
       });
       return res.json({
         success: true,
@@ -111,7 +113,8 @@ class AdminUserController {
       const { targetUserId } = req.body;
       const result = await AdminUserService.activateUser({
         schoolId: req.user.schoolId,
-        targetUserId
+        targetUserId,
+        adminUser: req.user
       });
       return res.json(result);
     } catch (error) {

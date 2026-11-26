@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const HeadTeacherController = require('../controllers/headTeacher.controller');
+const MarksAndAuditController = require('../controllers/marksAndAudit.controller');
 const { verifyUserAuth, authorizeRoles } = require('../middlewares/auth.middleware');
 
 // Enforce authentication & HEAD_TEACHER or ADMIN role for academic supervision endpoints
@@ -73,5 +74,18 @@ router.post('/results/return', HeadTeacherController.returnResultBatch);
 router.post('/results/publish', HeadTeacherController.publishResultBatch);
 router.get('/results/examination/:resultId/pdf', HeadTeacherController.downloadExaminationResultPdf);
 router.get('/results/final/:finalResultId/pdf', HeadTeacherController.downloadFinalResultPdf);
+
+// ==========================================
+// MODULE 6: ACADEMIC REPORTS, NOTIFICATIONS, MARKS LOCK & AUDIT LOG
+// ==========================================
+router.get('/reports', HeadTeacherController.getAcademicReports);
+router.get('/reports/pdf', HeadTeacherController.downloadAcademicReportPdf);
+router.get('/notifications', HeadTeacherController.getNotifications);
+router.get('/notifications/recipients', HeadTeacherController.getNotificationRecipients);
+router.post('/notifications/send', HeadTeacherController.sendNotification);
+router.get('/notifications/sent', HeadTeacherController.getSentNotificationsHistory);
+router.get('/marks-lock', MarksAndAuditController.getMarksLockOverview);
+router.post('/marks-lock/update', MarksAndAuditController.updateMarksLockState);
+router.get('/audit-logs', MarksAndAuditController.getAuditLogs);
 
 module.exports = router;

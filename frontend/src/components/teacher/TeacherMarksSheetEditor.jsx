@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import StatusBadge from '../admin/StatusBadge';
 import { useAcademicYear } from '../../context/AcademicYearContext';
 import api from '../../services/api';
@@ -20,20 +21,29 @@ import {
  */
 const TeacherMarksSheetEditor = ({ mode, title, description, badgeLabel }) => {
   const { selectedYear } = useAcademicYear();
+  const [searchParams] = useSearchParams();
+  const qpYearId = searchParams.get('academicYearId') || '';
+  const qpExamId = searchParams.get('examinationId') || '';
+  const qpClassId = searchParams.get('classId') || '';
+  const qpSectionId = searchParams.get('sectionId') || '';
+  const qpSubjectId = searchParams.get('subjectId') || '';
+  const qpEntryType = searchParams.get('entryType') || '';
 
-  const [academicYearId, setAcademicYearId] = useState(selectedYear?._id || '');
+  const [academicYearId, setAcademicYearId] = useState(qpYearId || selectedYear?._id || '');
   const [availableYears, setAvailableYears] = useState([]);
   const [examinations, setExaminations] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [resultConfig, setResultConfig] = useState(null);
 
   // Selected Filters
-  const [coCurricularPeriod, setCoCurricularPeriod] = useState('CO_CURRICULAR_TERM'); // or 'CO_CURRICULAR_FINAL'
-  const [extraScope, setExtraScope] = useState('CLASS_ADDITIONAL');
-  const [selectedExamId, setSelectedExamId] = useState('');
-  const [selectedClassId, setSelectedClassId] = useState('');
-  const [selectedSectionId, setSelectedSectionId] = useState('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [coCurricularPeriod, setCoCurricularPeriod] = useState(
+    qpEntryType === 'CO_CURRICULAR_FINAL' ? 'CO_CURRICULAR_FINAL' : 'CO_CURRICULAR_TERM'
+  ); // or 'CO_CURRICULAR_FINAL'
+  const [extraScope, setExtraScope] = useState(qpExamId || 'CLASS_ADDITIONAL');
+  const [selectedExamId, setSelectedExamId] = useState(qpExamId);
+  const [selectedClassId, setSelectedClassId] = useState(qpClassId);
+  const [selectedSectionId, setSelectedSectionId] = useState(qpSectionId);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(qpSubjectId);
 
   // Sheet Data
   const [loadingOptions, setLoadingOptions] = useState(true);
@@ -611,9 +621,10 @@ const TeacherMarksSheetEditor = ({ mode, title, description, badgeLabel }) => {
             </div>
 
             {sheet.isLocked ? (
-              <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">
-                <Lock className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-                Locked ({sheet.submission?.status})
+              <div className="inline-flex items-center px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800">
+                <Lock className="w-3.5 h-3.5 mr-1.5 text-rose-600" />
+                Locked by {sheet.submission?.lockedByRole || 'Authority'}
+                {sheet.submission?.lockReason ? ` — ${sheet.submission.lockReason}` : ''}
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -633,11 +644,25 @@ const TeacherMarksSheetEditor = ({ mode, title, description, badgeLabel }) => {
                   className="inline-flex items-center px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg shadow-xs transition-colors"
                 >
                   <Send className="w-3.5 h-3.5 mr-1.5" />
-                  {sheet.submission?.status === 'RETURNED' ? 'Resubmit Corrected' : 'Submit'}
+                  {sheet.submission?.status === 'RETURNED'
+                    ? 'Resubmit Corrected'
+                    : ['SUBMITTED', 'VERIFIED'].includes(sheet.submission?.status)
+                    ? 'Update Submitted Marks'
+                    : 'Submit'}
                 </button>
               </div>
             )}
           </div>
+
+          {!sheet.isLocked && ['SUBMITTED', 'VERIFIED'].includes(sheet.submission?.status) && (
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 flex items-start space-x-2">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <span>
+                These marks are currently <strong>{sheet.submission.status}</strong> and remain unlocked.
+                Updating and saving will write an audit trail diff and notify the Class Teacher for re-verification if needed.
+              </span>
+            </div>
+          )}
 
           {/* Return Reason Warning if Returned */}
           {sheet.submission?.status === 'RETURNED' && sheet.submission?.returnReason && (
