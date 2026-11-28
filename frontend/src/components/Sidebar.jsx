@@ -163,30 +163,30 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col min-h-[calc(100vh-4rem)] border-r border-slate-800 select-none">
+    <aside className="w-64 bg-slate-100 text-slate-800 flex flex-col min-h-[calc(100vh-4rem)] border-r border-slate-200 select-none">
       {/* School Card in Sidebar */}
-      <div className="p-4 border-b border-slate-800 bg-slate-950/40">
+      <div className="p-4 border-b border-slate-200 bg-slate-200/50">
         <div className="flex items-start space-x-3">
           {currentSchool?.schoolLogoUrl ? (
             <img
               src={currentSchool.schoolLogoUrl}
               alt="School Logo"
-              className="w-9 h-9 rounded-lg object-contain bg-white/10 p-1 border border-slate-700 mt-0.5 shrink-0"
+              className="w-9 h-9 rounded-lg object-contain bg-white p-1 border border-slate-300 mt-0.5 shrink-0"
               onError={(e) => { e.target.style.display = 'none'; }}
             />
           ) : (
-            <div className="p-2 bg-blue-600/10 rounded-lg border border-blue-500/20 text-blue-400 mt-0.5 shrink-0">
+            <div className="p-2 bg-blue-600/10 rounded-lg border border-blue-500/20 text-blue-600 mt-0.5 shrink-0">
               <Building className="w-5 h-5" />
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-white truncate" title={currentSchool?.schoolName}>
+            <p className="text-sm font-semibold text-slate-900 truncate" title={currentSchool?.schoolName}>
               {currentSchool?.schoolName || 'School Portal'}
             </p>
-            <p className="text-[11px] font-mono text-slate-400 mt-0.5">
+            <p className="text-xs font-mono text-slate-600 mt-0.5">
               ID: {currentSchool?.schoolId}
             </p>
-            <span className={`inline-block mt-2 px-2 py-0.5 text-[10px] font-medium rounded border ${getRoleBadgeColor(effectivePanel || currentUser?.roleCode)}`}>
+            <span className={`inline-block mt-2 px-2 py-0.5 text-[11px] font-medium rounded border ${getRoleBadgeColor(effectivePanel || currentUser?.roleCode)}`}>
               {isDualAccessHT
                 ? effectivePanel === 'TEACHER'
                   ? 'Teacher Panel (Head Teacher)'
@@ -199,7 +199,7 @@ const Sidebar = () => {
 
       {/* Navigation Links */}
       <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+        <div className="px-3 pb-2 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
           Main Menu
         </div>
 
@@ -207,10 +207,10 @@ const Sidebar = () => {
         <NavLink
           to="/dashboard"
           className={({ isActive }) =>
-            `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+            `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
               isActive
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
             }`
           }
         >
@@ -221,7 +221,7 @@ const Sidebar = () => {
         {/* HEAD TEACHER ONLY: Module 1 Academic Overview Expandable Menu */}
         {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2">
-            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-2 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Academic Oversight
             </div>
 
@@ -229,38 +229,38 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setHeadTeacherAcademicOpen(!headTeacherAcademicOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isInsideHeadTeacherAcademic
-                  ? 'text-white bg-slate-800/80'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'text-slate-900 bg-slate-200'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
               }`}
             >
               <div className="flex items-center">
-                <GraduationCap className="w-4 h-4 mr-3 text-purple-400" />
+                <GraduationCap className="w-4 h-4 mr-3 text-purple-600" />
                 <span>Academic Overview</span>
               </div>
               {headTeacherAcademicOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               )}
             </button>
 
             {/* Expandable Sub-items */}
             {headTeacherAcademicOpen && (
-              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                 {/* 1. Classes & Sections */}
                 <NavLink
                   to="/head-teacher/classes"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Layers className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Layers className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Classes &amp; Sections</span>
                 </NavLink>
 
@@ -268,14 +268,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/subjects"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Subject Overview</span>
                 </NavLink>
 
@@ -283,14 +283,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/teachers"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <GraduationCap className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <GraduationCap className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Teacher Overview</span>
                 </NavLink>
 
@@ -298,14 +298,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/teacher-assignments"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <CheckCircle2 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Teacher Assignments</span>
                 </NavLink>
               </div>
@@ -316,7 +316,7 @@ const Sidebar = () => {
         {/* HEAD TEACHER ONLY: Module 2 Student Overview Expandable Menu */}
         {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2">
-            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-2 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Student Oversight
             </div>
 
@@ -324,39 +324,39 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setHeadTeacherStudentOpen(!headTeacherStudentOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isInsideHeadTeacherStudent
-                  ? 'text-white bg-slate-800/80'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'text-slate-900 bg-slate-200'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
               }`}
             >
               <div className="flex items-center">
-                <Users className="w-4 h-4 mr-3 text-cyan-400" />
+                <Users className="w-4 h-4 mr-3 text-cyan-600" />
                 <span>Student Overview</span>
               </div>
               {headTeacherStudentOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               )}
             </button>
 
             {/* Expandable Sub-items */}
             {headTeacherStudentOpen && (
-              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                 {/* 1. Student List */}
                 <NavLink
                   to="/head-teacher/students"
                   end
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Student List</span>
                 </NavLink>
 
@@ -364,14 +364,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/student-profile"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <UserCheck className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <UserCheck className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Student Profile</span>
                 </NavLink>
 
@@ -379,14 +379,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/student-performance"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Student Performance</span>
                 </NavLink>
               </div>
@@ -397,7 +397,7 @@ const Sidebar = () => {
         {/* HEAD TEACHER ONLY: Module 4 Examination Management Expandable Menu */}
         {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2">
-            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-2 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Examination Oversight
             </div>
 
@@ -405,38 +405,38 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setHeadTeacherExaminationOpen(!headTeacherExaminationOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isInsideHeadTeacherExamination
-                  ? 'text-white bg-slate-800/80'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'text-slate-900 bg-slate-200'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
               }`}
             >
               <div className="flex items-center">
-                <ClipboardList className="w-4 h-4 mr-3 text-amber-400" />
+                <ClipboardList className="w-4 h-4 mr-3 text-amber-600" />
                 <span>Examination Management</span>
               </div>
               {headTeacherExaminationOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               )}
             </button>
 
             {/* Expandable Sub-items */}
             {headTeacherExaminationOpen && (
-              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                 {/* 1. Examination Overview */}
                 <NavLink
                   to="/head-teacher/examinations"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <ClipboardList className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <ClipboardList className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Examination Overview</span>
                 </NavLink>
 
@@ -444,14 +444,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/examination-schedule"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Clock className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Clock className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Examination Schedule</span>
                 </NavLink>
 
@@ -459,14 +459,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/subject-configurations"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Sliders className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Sliders className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Subject Configuration Overview</span>
                 </NavLink>
 
@@ -474,14 +474,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/head-teacher/marks-entry-monitoring"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <BarChart3 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <BarChart3 className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Marks Entry Monitoring</span>
                 </NavLink>
               </div>
@@ -492,85 +492,85 @@ const Sidebar = () => {
         {/* HEAD TEACHER ONLY: Result Approval, Lock Controls, Reports, Notifications & Audit Log */}
         {effectivePanel === 'HEAD_TEACHER' && (
           <div className="pt-2 space-y-1">
-            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-1 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Result Approval &amp; Reports
             </div>
             <NavLink
               to="/head-teacher/result-approval"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Award className="w-4 h-4 mr-3 text-purple-400" />
+              <Award className="w-4 h-4 mr-3 text-purple-600" />
               <span>Result Review &amp; Publish</span>
             </NavLink>
             <NavLink
               to="/head-teacher/marks-lock"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Lock className="w-4 h-4 mr-3 text-amber-400" />
+              <Lock className="w-4 h-4 mr-3 text-amber-600" />
               <span>Marks Entry Lock Controls</span>
             </NavLink>
             <NavLink
               to="/head-teacher/reports"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <FileBarChart2 className="w-4 h-4 mr-3 text-indigo-400" />
+              <FileBarChart2 className="w-4 h-4 mr-3 text-indigo-600" />
               <span>Academic Reports</span>
             </NavLink>
             <NavLink
               to="/head-teacher/notifications"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Bell className="w-4 h-4 mr-3 text-sky-400" />
+              <Bell className="w-4 h-4 mr-3 text-sky-600" />
               <span>Notifications</span>
             </NavLink>
             <NavLink
               to="/head-teacher/send-notifications"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Send className="w-4 h-4 mr-3 text-emerald-400" />
+              <Send className="w-4 h-4 mr-3 text-emerald-600" />
               <span>Send Notifications</span>
             </NavLink>
             <NavLink
               to="/head-teacher/audit-logs"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <ScrollText className="w-4 h-4 mr-3 text-slate-400" />
+              <ScrollText className="w-4 h-4 mr-3 text-current opacity-75" />
               <span>Audit Log</span>
             </NavLink>
           </div>
@@ -579,7 +579,7 @@ const Sidebar = () => {
         {/* TEACHER PANEL ONLY (Completely separate from Head Teacher sidebar) */}
         {hasTeacherPanelAccess && (
           <div className="pt-2 space-y-1">
-            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-1 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Teaching &amp; Assessment
             </div>
 
@@ -587,14 +587,14 @@ const Sidebar = () => {
             <NavLink
               to="/teacher/my-classes"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Layers className="w-4 h-4 mr-3 text-emerald-400" />
+              <Layers className="w-4 h-4 mr-3 text-emerald-600" />
               <span>My Classes &amp; Assignments</span>
             </NavLink>
 
@@ -603,78 +603,78 @@ const Sidebar = () => {
               <button
                 type="button"
                 onClick={() => setTeacherMarksOpen(!teacherMarksOpen)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isInsideTeacherMarks
-                    ? 'text-white bg-slate-800/80'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    ? 'text-slate-900 bg-slate-200'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`}
               >
                 <div className="flex items-center">
-                  <Edit3 className="w-4 h-4 mr-3 text-emerald-400" />
+                  <Edit3 className="w-4 h-4 mr-3 text-emerald-600" />
                   <span>Marks Management</span>
                 </div>
                 {teacherMarksOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
                 )}
               </button>
 
               {teacherMarksOpen && (
-                <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                   <NavLink
                     to="/teacher/marks-entry"
                     className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                       }`
                     }
                   >
-                    <Edit3 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <Edit3 className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                     <span>Marks Entry</span>
                   </NavLink>
 
                   <NavLink
                     to="/teacher/submitted-marks"
                     className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                       }`
                     }
                   >
-                    <Send className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <Send className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                     <span>Submitted Marks</span>
                   </NavLink>
 
                   <NavLink
                     to="/teacher/extra-components"
                     className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                       }`
                     }
                   >
-                    <Sliders className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <Sliders className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                     <span>Extra Components</span>
                   </NavLink>
 
                   <NavLink
                     to="/teacher/co-curricular-grades"
                     className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                       }`
                     }
                   >
-                    <Sparkles className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <Sparkles className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                     <span>Co-curricular Grades</span>
                   </NavLink>
                 </div>
@@ -686,66 +686,66 @@ const Sidebar = () => {
               <button
                 type="button"
                 onClick={() => setTeacherResultsOpen(!teacherResultsOpen)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isInsideTeacherResults
-                    ? 'text-white bg-slate-800/80'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    ? 'text-slate-900 bg-slate-200'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`}
               >
                 <div className="flex items-center">
-                  <Award className="w-4 h-4 mr-3 text-teal-400" />
+                  <Award className="w-4 h-4 mr-3 text-teal-600" />
                   <span>Class Result Management</span>
                 </div>
                 {teacherResultsOpen ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
                 )}
               </button>
 
               {teacherResultsOpen && (
-                <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+                <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                   {isClassTeacher && (
                     <>
                       <NavLink
                         to="/teacher/marks-verification"
                         className={({ isActive }) =>
-                          `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                          `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                             isActive
                               ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                           }`
                         }
                       >
-                        <ListChecks className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                        <ListChecks className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                         <span>Marks Verification</span>
                       </NavLink>
 
                       <NavLink
                         to="/teacher/examination-results"
                         className={({ isActive }) =>
-                          `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                          `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                             isActive
                               ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                           }`
                         }
                       >
-                        <FileCheck2 className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                        <FileCheck2 className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                         <span>Examination Results</span>
                       </NavLink>
 
                       <NavLink
                         to="/teacher/final-result"
                         className={({ isActive }) =>
-                          `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                          `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                             isActive
                               ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                           }`
                         }
                       >
-                        <Award className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                        <Award className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                         <span>Final Result</span>
                       </NavLink>
                     </>
@@ -754,14 +754,14 @@ const Sidebar = () => {
                   <NavLink
                     to="/teacher/result-performance"
                     className={({ isActive }) =>
-                      `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                      `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                       }`
                     }
                   >
-                    <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                    <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                     <span>Result &amp; Performance</span>
                   </NavLink>
                 </div>
@@ -773,59 +773,59 @@ const Sidebar = () => {
         {/* OFFICE STAFF ONLY: Office & Academic Records Portal */}
         {effectivePanel === 'OFFICE_STAFF' && (
           <div className="pt-2 space-y-1">
-            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-1 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Office &amp; Published Records
             </div>
             <NavLink
               to="/office/published-results"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <FileCheck2 className="w-4 h-4 mr-3 text-amber-400" />
+              <FileCheck2 className="w-4 h-4 mr-3 text-amber-600" />
               <span>Published Results</span>
             </NavLink>
             <NavLink
               to="/office/academic-reports"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <FileBarChart2 className="w-4 h-4 mr-3 text-indigo-400" />
+              <FileBarChart2 className="w-4 h-4 mr-3 text-indigo-600" />
               <span>Academic Reports</span>
             </NavLink>
             <NavLink
               to="/office/download-history"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <History className="w-4 h-4 mr-3 text-emerald-400" />
+              <History className="w-4 h-4 mr-3 text-emerald-600" />
               <span>Download History</span>
             </NavLink>
             <NavLink
               to="/office/notifications"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Bell className="w-4 h-4 mr-3 text-sky-400" />
+              <Bell className="w-4 h-4 mr-3 text-sky-600" />
               <span>Notifications</span>
             </NavLink>
           </div>
@@ -834,7 +834,7 @@ const Sidebar = () => {
         {/* ADMIN ONLY: Administrative Setup Expandable Menu */}
         {currentUser?.roleCode === 'ADMIN' && (
           <div className="pt-2">
-            <div className="px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-2 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Administration
             </div>
 
@@ -842,38 +842,38 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setAdminSetupOpen(!adminSetupOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isInsideAdmin
-                  ? 'text-white bg-slate-800/80'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'text-slate-900 bg-slate-200'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
               }`}
             >
               <div className="flex items-center">
-                <Settings className="w-4 h-4 mr-3 text-blue-400" />
+                <Settings className="w-4 h-4 mr-3 text-blue-600" />
                 <span>Administrative Setup</span>
               </div>
               {adminSetupOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               )}
             </button>
 
             {/* Expandable Sub-items */}
             {adminSetupOpen && (
-              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                 {/* 1. User Management */}
                 <NavLink
                   to="/admin/users"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>User Management</span>
                 </NavLink>
 
@@ -881,14 +881,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/admin/academic-years"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Calendar className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Calendar className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Academic Year Management</span>
                 </NavLink>
 
@@ -897,14 +897,14 @@ const Sidebar = () => {
                   <button
                     type="button"
                     onClick={() => setClassesSectionsOpen(!classesSectionsOpen)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isInsideClasses
                         ? 'text-white font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`}
                   >
                     <div className="flex items-center">
-                      <Layers className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                      <Layers className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                       <span>Classes &amp; Sections</span>
                     </div>
                     {classesSectionsOpen ? (
@@ -916,14 +916,14 @@ const Sidebar = () => {
 
                   {/* Nested Class & Section links */}
                   {classesSectionsOpen && (
-                    <div className="ml-4 pl-2 border-l border-slate-800/80 space-y-1 mt-1">
+                    <div className="ml-4 pl-2 border-l border-slate-300/80 space-y-1 mt-1">
                       <NavLink
                         to="/admin/classes"
                         className={({ isActive }) =>
                           `flex items-center px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
                             isActive
                               ? 'bg-blue-600 text-white font-semibold'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/60'
                           }`
                         }
                       >
@@ -937,7 +937,7 @@ const Sidebar = () => {
                           `flex items-center px-2.5 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
                             isActive
                               ? 'bg-blue-600 text-white font-semibold'
-                              : 'text-slate-400 hover:text-white hover:bg-slate-800/40'
+                              : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/60'
                           }`
                         }
                       >
@@ -952,14 +952,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/admin/subjects"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Subjects Management</span>
                 </NavLink>
 
@@ -967,14 +967,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/admin/school-profile"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Building className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Building className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>School Profile</span>
                 </NavLink>
               </div>
@@ -989,38 +989,38 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setAcademicManagementOpen(!academicManagementOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isInsideAcademicManagement
-                  ? 'text-white bg-slate-800/80'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'text-slate-900 bg-slate-200'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
               }`}
             >
               <div className="flex items-center">
-                <GraduationCap className="w-4 h-4 mr-3 text-indigo-400" />
+                <GraduationCap className="w-4 h-4 mr-3 text-indigo-600" />
                 <span>Academic Management</span>
               </div>
               {academicManagementOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               )}
             </button>
 
             {/* Expandable Sub-items */}
             {academicManagementOpen && (
-              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                 {/* 1. Subject Allocation */}
                 <NavLink
                   to="/admin/subject-allocation"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <BookOpen className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Subject Allocation</span>
                 </NavLink>
 
@@ -1028,14 +1028,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/admin/teacher-assignment"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Teacher Assignment</span>
                 </NavLink>
 
@@ -1043,14 +1043,14 @@ const Sidebar = () => {
                 <NavLink
                   to="/admin/examinations"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Calendar className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Calendar className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Examination Management</span>
                 </NavLink>
               </div>
@@ -1064,93 +1064,93 @@ const Sidebar = () => {
             <button
               type="button"
               onClick={() => setStudentManagementOpen(!studentManagementOpen)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isInsideStudentManagement
-                  ? 'text-white bg-slate-800/80'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'text-slate-900 bg-slate-200'
+                  : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
               }`}
             >
               <div className="flex items-center">
-                <UserPlus className="w-4 h-4 mr-3 text-emerald-400" />
+                <UserPlus className="w-4 h-4 mr-3 text-emerald-600" />
                 <span>Student Management</span>
               </div>
               {studentManagementOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               )}
             </button>
 
             {studentManagementOpen && (
-              <div className="mt-1 ml-3 pl-3 border-l border-slate-800 space-y-1 animate-in fade-in duration-100">
+              <div className="mt-1 ml-3 pl-3 border-l border-slate-300 space-y-1 animate-in fade-in duration-100">
                 <NavLink
                   to="/admin/students"
                   end
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <Users className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <Users className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Student Directory</span>
                 </NavLink>
 
                 <NavLink
                   to="/admin/students/admission"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <UserPlus className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <UserPlus className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Student Admission</span>
                 </NavLink>
 
                 <NavLink
                   to="/admin/students/enrollments"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <ArrowRightLeft className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <ArrowRightLeft className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Enrollment &amp; Transfers</span>
                 </NavLink>
 
                 <NavLink
                   to="/admin/students/promotion"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <TrendingUp className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Student Promotion</span>
                 </NavLink>
 
                 <NavLink
                   to="/admin/students/import"
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-600 text-white shadow-xs font-semibold'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/70'
                     }`
                   }
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 mr-2.5 text-slate-400" />
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-2.5 text-current opacity-75" />
                   <span>Import Students</span>
                 </NavLink>
               </div>
@@ -1158,7 +1158,7 @@ const Sidebar = () => {
           </div>
         )}
 
-        <div className="pt-4 px-3 pb-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+        <div className="pt-4 px-3 pb-2 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
           Account &amp; Security
         </div>
 
@@ -1166,10 +1166,10 @@ const Sidebar = () => {
         <NavLink
           to="/profile"
           className={({ isActive }) =>
-            `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+            `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
               isActive
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
             }`
           }
         >
@@ -1181,10 +1181,10 @@ const Sidebar = () => {
         <NavLink
           to="/change-password"
           className={({ isActive }) =>
-            `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+            `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
               isActive
                 ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
             }`
           }
         >
@@ -1195,33 +1195,33 @@ const Sidebar = () => {
         {/* Admin only: Marks Entry Lock Controls & Audit Log */}
         {currentUser?.roleCode === 'ADMIN' && (
           <div className="pt-2 space-y-1">
-            <div className="px-3 pb-1 text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+            <div className="px-3 pb-1 text-[11px] uppercase font-bold text-slate-600 tracking-wider">
               Governance &amp; Controls
             </div>
             <NavLink
               to="/admin/marks-lock"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <Lock className="w-4 h-4 mr-3 text-amber-400" />
+              <Lock className="w-4 h-4 mr-3 text-amber-600" />
               <span>Marks Entry Lock Controls</span>
             </NavLink>
             <NavLink
               to="/admin/audit-logs"
               className={({ isActive }) =>
-                `flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-colors ${
+                `flex items-center px-3 py-2 text-sm font-semibold rounded-lg transition-colors ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-200/80'
                 }`
               }
             >
-              <ScrollText className="w-4 h-4 mr-3 text-indigo-400" />
+              <ScrollText className="w-4 h-4 mr-3 text-indigo-600" />
               <span>Audit Log</span>
             </NavLink>
           </div>
@@ -1232,10 +1232,10 @@ const Sidebar = () => {
           <NavLink
             to="/change-password?tab=school"
             className={({ isActive }) =>
-              `flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg transition-colors ${
+              `flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
                 isActive
                   ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-indigo-400 hover:text-indigo-300 hover:bg-slate-800/60'
+                  : 'text-indigo-600 hover:text-indigo-700 hover:bg-slate-200/80'
               }`
             }
           >
@@ -1248,7 +1248,7 @@ const Sidebar = () => {
         <button
           type="button"
           onClick={() => setRestartModalOpen(true)}
-          className="w-full flex items-center px-3 py-2.5 text-xs font-semibold rounded-lg text-amber-400 hover:text-amber-300 hover:bg-slate-800/60 transition-colors"
+          className="w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-lg text-amber-700 hover:text-amber-800 hover:bg-slate-200/80 transition-colors"
           title="Safely restart DMMS backend & frontend services"
         >
           <RefreshCw className="w-4 h-4 mr-3" />
@@ -1257,10 +1257,10 @@ const Sidebar = () => {
       </div>
 
       {/* Bottom Switch School option */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/20">
+      <div className="p-3 border-t border-slate-200 bg-slate-200/40">
         <button
           onClick={handleSchoolLogout}
-          className="w-full flex items-center justify-center px-3 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          className="w-full flex items-center justify-center px-3 py-2 text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors"
           title="Switch to another school or clear school session"
         >
           <LogOut className="w-4 h-4 mr-2" />

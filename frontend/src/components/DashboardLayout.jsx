@@ -22,10 +22,10 @@ const DashboardLayout = ({ children }) => {
       <Header />
 
       {/* Mobile Sidebar Toggle Button */}
-      <div className="md:hidden bg-slate-900 text-white px-4 py-2 flex items-center justify-between border-b border-slate-800">
+      <div className="md:hidden bg-slate-100 text-slate-800 px-4 py-2 flex items-center justify-between border-b border-slate-200">
         <button
           onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-          className="flex items-center space-x-2 text-xs font-medium text-slate-300 hover:text-white"
+          className="flex items-center space-x-2 text-sm font-medium text-slate-700 hover:text-slate-900"
         >
           {mobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
           <span>{mobileSidebarOpen ? 'Close Menu' : 'Open Sidebar'}</span>
@@ -43,7 +43,7 @@ const DashboardLayout = ({ children }) => {
         {mobileSidebarOpen && (
           <div className="fixed inset-0 z-50 md:hidden flex">
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setMobileSidebarOpen(false)} />
-            <div className="relative w-64 bg-slate-900 z-10 flex flex-col h-full shadow-2xl">
+            <div className="relative w-64 bg-slate-100 z-10 flex flex-col h-full shadow-2xl">
               <Sidebar />
             </div>
           </div>
