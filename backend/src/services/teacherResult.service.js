@@ -1996,7 +1996,7 @@ class TeacherResultService {
         doc.font('Helvetica').fontSize(7.4).fillColor('#475569').text(
           'Page 1 — Academic Performance Breakdown   |   Continued on Page 2 (Co-Curricular Activities & Term Evaluations)',
           lLeft,
-          doc.page.height - 34,
+          doc.page.height - 48,
           { width: lContentW, align: 'center' }
         );
 
@@ -2132,7 +2132,7 @@ class TeacherResultService {
         doc.font('Helvetica').fontSize(7.2).fillColor('#475569').text(
           'Page 2 — Co-Curricular Activities & Term Evaluations   |   Continued on Page 3 (Final Result & Declaration)',
           pLeft,
-          doc.page.height - 34,
+          doc.page.height - 48,
           { width: pContentW, align: 'center' }
         );
 
@@ -2222,7 +2222,7 @@ class TeacherResultService {
         doc.font('Helvetica').fontSize(7.5).fillColor('#64748b').text(
           `Status: ${result.status}  |  Policy v${result.configVersion || 1}  |  Generated: ${new Date(result.generatedAt || Date.now()).toLocaleDateString('en-GB')}`,
           pLeft,
-          doc.page.height - 34,
+          doc.page.height - 48,
           { width: pContentW, align: 'center' }
         );
 
