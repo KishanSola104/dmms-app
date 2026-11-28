@@ -1651,7 +1651,7 @@ class TeacherResultService {
         doc.font('Helvetica').fontSize(7.2).fillColor('#64748b').text(
           `Status: ${result.status}  |  Generated: ${new Date(result.generatedAt || Date.now()).toLocaleDateString('en-GB')}`,
           left,
-          doc.page.height - 34,
+          doc.page.height - 48,
           { width: contentW, align: 'center' }
         );
 
