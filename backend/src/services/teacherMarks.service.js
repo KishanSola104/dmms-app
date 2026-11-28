@@ -144,9 +144,28 @@ class TeacherMarksService {
       assignQuery.subjectType = 'ACADEMIC';
     }
 
-    const assignments = await SubjectTeacherAssignmentInfo.find(assignQuery)
+    const rawAssignments = await SubjectTeacherAssignmentInfo.find(assignQuery)
       .sort({ className: 1, sectionName: 1, subjectName: 1 })
       .lean();
+
+    // Filter out subjects that have been deallocated from the class in this academic year
+    const activeClassAllocations = rawAssignments.length > 0
+      ? await ClassSubjectInfo.find({
+          schoolId,
+          academicYearRef: ayId,
+          classRef: { $in: Array.from(new Set(rawAssignments.map(a => a.classRef))) },
+          status: 'ACTIVE'
+        })
+          .select('classRef subjectRef')
+          .lean()
+      : [];
+    const activeAllocKeySet = new Set(
+      activeClassAllocations.map(cs => `${cs.classRef.toString()}_${cs.subjectRef.toString()}`)
+    );
+
+    const assignments = rawAssignments.filter(a =>
+      activeAllocKeySet.has(`${a.classRef.toString()}_${a.subjectRef.toString()}`)
+    );
 
     if (assignments.length === 0) {
       return {
@@ -313,6 +332,22 @@ class TeacherMarksService {
     });
     if (!assignment) {
       const err = new Error('Access denied. You are not assigned to teach this subject in the selected class and section.');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    // Ensure the subject is still actively allocated to this class for this academic year
+    const activeClassAllocation = await ClassSubjectInfo.findOne({
+      schoolId,
+      academicYearRef: ayId,
+      classRef: classId,
+      subjectRef: subjectId,
+      status: 'ACTIVE'
+    }).lean();
+    if (!activeClassAllocation) {
+      const err = new Error(
+        'This subject has been deallocated from this class for the selected academic year. New marks entry is disabled; historical records remain preserved.'
+      );
       err.statusCode = 403;
       throw err;
     }
@@ -1289,6 +1324,8 @@ class TeacherMarksService {
       subMap.set(k, s);
     });
 
+    const activeClassSubjIds = new Set(classSubjects.map(cs => cs.subjectRef.toString()));
+
     const items = [];
     const pendingItems = [];
 
@@ -1296,6 +1333,10 @@ class TeacherMarksService {
     for (const es of examSubjects) {
       const entryType = es.subjectType === 'CO_CURRICULAR' ? 'CO_CURRICULAR_TERM' : 'EXAM_ACADEMIC';
       const sub = subMap.get(`${targetExam._id.toString()}_${es.subjectRef.toString()}_${entryType}`);
+      // If subject was deallocated from the class and has no historical submission, skip requiring new marks entry
+      if (!activeClassSubjIds.has(es.subjectRef.toString()) && !sub) {
+        continue;
+      }
       const assign = assignBySubject.get(es.subjectRef.toString());
       const status = sub ? sub.status : 'NOT_SUBMITTED';
 

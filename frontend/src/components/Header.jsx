@@ -3,8 +3,9 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useUserAuth } from '../context/UserAuthContext';
 import { useAcademicYear } from '../context/AcademicYearContext';
+import { useBackendHealth } from '../context/BackendHealthContext';
 import NotificationDropdown from './NotificationDropdown';
-import { User, KeyRound, LogOut, Shield, ChevronDown, Calendar, Building2, ArrowLeftRight } from 'lucide-react';
+import { User, KeyRound, LogOut, Shield, ChevronDown, Calendar, Building2, ArrowLeftRight, RefreshCw } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
 const Header = () => {
@@ -13,10 +14,11 @@ const Header = () => {
   const { currentSchool, isSchoolAuthenticated, logoutSchool } = useSchoolAuth();
   const { currentUser, activePanel, switchPanel, isUserAuthenticated, logoutUser } = useUserAuth();
   const { academicYears, selectedYear, switchAcademicYear } = useAcademicYear();
+  const { isBackendOnline, refreshApp } = useBackendHealth();
 
   // The authenticated dashboard layout must only render when both school and user auth states are valid,
-  // and never on unauthenticated layout routes (School Login, Register, User Login, Home).
-  const unauthenticatedPaths = ['/school-login', '/register-school', '/user-login', '/'];
+  // and never on unauthenticated layout routes (School Login, Register, User Login, Home, Refresh App).
+  const unauthenticatedPaths = ['/school-login', '/register-school', '/user-login', '/refresh-app', '/'];
   const isUnauthenticatedPath = unauthenticatedPaths.includes(location.pathname);
   const showDashboardHeader = isSchoolAuthenticated && isUserAuthenticated && !isUnauthenticatedPath;
 
@@ -271,14 +273,27 @@ const Header = () => {
               /* Public Header Buttons */
               <div className="flex items-center space-x-2 sm:space-x-3">
                 <button
+                  type="button"
+                  onClick={() => refreshApp({ reloadPage: true })}
+                  title={isBackendOnline ? 'Refresh App' : 'DMMS server offline — click to refresh & reconnect'}
+                  className={`inline-flex items-center space-x-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg border transition-colors cursor-pointer ${
+                    isBackendOnline
+                      ? 'text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-blue-600'
+                      : 'text-amber-800 bg-amber-50 border-amber-300 hover:bg-amber-100'
+                  }`}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Refresh App</span>
+                </button>
+                <button
                   onClick={handleSmartLoginClick}
-                  className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-blue-600 transition-colors"
+                  className="px-4 py-2 text-sm font-semibold text-slate-700 hover:text-blue-600 transition-colors cursor-pointer"
                 >
                   Login
                 </button>
                 <button
                   onClick={() => navigate('/register-school')}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs hover:shadow transition-all"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs hover:shadow transition-all cursor-pointer"
                 >
                   Register School
                 </button>

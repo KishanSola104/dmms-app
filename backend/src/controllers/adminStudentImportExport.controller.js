@@ -1,4 +1,5 @@
 const StudentImportExportService = require('../services/studentImportExport.service');
+const StudentService = require('../services/student.service');
 const AuditLogService = require('../services/auditLog.service');
 
 class AdminStudentImportExportController {
@@ -107,8 +108,18 @@ class AdminStudentImportExportController {
   static async exportStudentsExcel(req, res, next) {
     try {
       const schoolId = req.user?.schoolId || req.school?.schoolId;
-      const { academicYearRef, academicYearId, classRef, classId, sectionRef, sectionId, status, gender, search } =
-        req.query;
+      const {
+        academicYearRef,
+        academicYearId,
+        classRef,
+        classId,
+        sectionRef,
+        sectionId,
+        status,
+        enrollmentStatus,
+        gender,
+        search
+      } = req.query;
 
       const buffer = await StudentImportExportService.exportStudentsToExcel({
         schoolId,
@@ -116,12 +127,16 @@ class AdminStudentImportExportController {
         classRef: classRef || classId,
         sectionRef: sectionRef || sectionId,
         status,
+        enrollmentStatus,
         gender,
         search
       });
 
+      const dateTag = new Date().toISOString().slice(0, 10);
+      const fileName = `DMMS_Students_Directory_${schoolId || 'SCHOOL'}_${dateTag}.xlsx`;
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', 'attachment; filename="DMMS_Students_Export.xlsx"');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       return res.status(200).send(buffer);
     } catch (error) {
       next(error);
@@ -162,15 +177,90 @@ class AdminStudentImportExportController {
       const { classId, sectionId } = req.params;
       const { academicYearRef, academicYearId } = req.query;
 
-      const pdfBuffer = await StudentImportExportService.exportClassListToPDF({
-        schoolId,
-        academicYearRef: academicYearRef || academicYearId,
-        classRef: classId,
-        sectionRef: sectionId
-      });
+      const ayId = academicYearRef || academicYearId;
+      const [summary, pdfBuffer] = await Promise.all([
+        StudentService.getSectionEnrollmentSummary({
+          schoolId,
+          academicYearRef: ayId,
+          classRef: classId,
+          sectionRef: sectionId
+        }),
+        StudentImportExportService.exportClassListToPDF({
+          schoolId,
+          academicYearRef: ayId,
+          classRef: classId,
+          sectionRef: sectionId
+        })
+      ]);
+
+      const safePart = (v) => String(v || '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+      const fileName = `Enrollment_Roster_${safePart(summary.class?.classCode || summary.class?.className)}_${safePart(summary.section?.sectionCode || summary.section?.sectionName)}_${safePart(summary.academicYear?.yearName)}.pdf`;
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="Class_Roster.pdf"');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      return res.status(200).send(pdfBuffer);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/admin/enrollments/transfers
+   * List section transfer records for the selected academic year / class / section
+   */
+  static async listSectionTransfers(req, res, next) {
+    try {
+      const schoolId = req.user?.schoolId || req.school?.schoolId;
+      const { academicYearRef, academicYearId, classRef, classId, sectionRef, sectionId } = req.query;
+      const data = await StudentService.listSectionTransfers({
+        schoolId,
+        academicYearRef: academicYearRef || academicYearId,
+        classRef: classRef || classId,
+        sectionRef: sectionRef || sectionId
+      });
+      return res.json({ success: true, ...data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/admin/enrollments/transfers/export/pdf
+   * Export section transfer roster to PDF
+   */
+  static async exportSectionTransferRosterPDF(req, res, next) {
+    try {
+      const schoolId = req.user?.schoolId || req.school?.schoolId;
+      const { academicYearRef, academicYearId, classRef, classId, sectionRef, sectionId } = req.query;
+      const ayId = academicYearRef || academicYearId;
+      const cId = classRef || classId;
+      const sId = sectionRef || sectionId;
+
+      const [transferData, pdfBuffer] = await Promise.all([
+        StudentService.listSectionTransfers({
+          schoolId,
+          academicYearRef: ayId,
+          classRef: cId,
+          sectionRef: sId
+        }),
+        StudentImportExportService.exportSectionTransferRosterToPDF({
+          schoolId,
+          academicYearRef: ayId,
+          classRef: cId,
+          sectionRef: sId
+        })
+      ]);
+
+      const safePart = (v) => String(v || '').replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+      const scopePart = transferData.section
+        ? `${safePart(transferData.class?.classCode || transferData.class?.className)}_${safePart(transferData.section?.sectionCode || transferData.section?.sectionName)}`
+        : transferData.class
+          ? safePart(transferData.class?.classCode || transferData.class?.className)
+          : 'All_Classes';
+      const fileName = `Section_Transfer_Roster_${scopePart}_${safePart(transferData.academicYear?.yearName || 'Session')}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
       return res.status(200).send(pdfBuffer);
     } catch (error) {
       next(error);

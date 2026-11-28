@@ -74,6 +74,7 @@ const TeacherAssignmentPage = () => {
   const [reassignError, setReassignError] = useState('');
 
   
+const [togglingId, setTogglingId] = useState(null);
 
   // 1. Initial Load: Classes and Teachers
   useEffect(() => {

@@ -32,7 +32,7 @@ import {
 const StudentListPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { academicYears, selectedAcademicYear } = useAcademicYear();
+  const { academicYears, selectedYear } = useAcademicYear();
 
   // Filter States
   const [academicYearId, setAcademicYearId] = useState('');
@@ -81,13 +81,13 @@ const StudentListPage = () => {
 
   // Set default academic year from context once available
   useEffect(() => {
-    if (selectedAcademicYear?._id && !academicYearId) {
-      setAcademicYearId(selectedAcademicYear._id);
+    if (selectedYear?._id && !academicYearId) {
+      setAcademicYearId(selectedYear._id);
     } else if (academicYears.length > 0 && !academicYearId) {
       const current = academicYears.find((y) => y.isCurrent) || academicYears[0];
       setAcademicYearId(current._id);
     }
-  }, [selectedAcademicYear, academicYears]);
+  }, [selectedYear, academicYears]);
 
   // Load Classes for the school
   useEffect(() => {
@@ -344,6 +344,10 @@ const StudentListPage = () => {
 
   // Export to Excel
   const handleExportExcel = async () => {
+    if (students.length === 0 || pagination.totalRecords === 0) {
+      setAlert({ type: 'error', message: 'No student records match the selected filters to export.' });
+      return;
+    }
     try {
       const params = new URLSearchParams();
       if (academicYearId && academicYearId !== 'ALL') params.append('academicYearRef', academicYearId);
@@ -353,22 +357,30 @@ const StudentListPage = () => {
       if (genderFilter && genderFilter !== 'ALL') params.append('gender', genderFilter);
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-      const res = await fetch(`http://127.0.0.1:8000/api/admin/students/export/excel?${params.toString()}`, {
+      const res = await fetch(`/api/admin/students/export/excel?${params.toString()}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'x-school-token': localStorage.getItem('schoolToken') || ''
+          Authorization: `Bearer ${localStorage.getItem('dmms_user_token') || ''}`,
+          'x-school-token': localStorage.getItem('dmms_school_token') || ''
         }
       });
-      if (!res.ok) throw new Error('Failed to export students.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Failed to export students to Excel.');
+      }
+
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const fileName = match ? match[1] : `DMMS_Students_Directory_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `DMMS_Students_Export.xlsx`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       a.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       setAlert({ type: 'error', message: err.message || 'Export failed.' });
     }

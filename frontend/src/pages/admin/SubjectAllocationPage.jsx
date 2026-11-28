@@ -25,12 +25,16 @@ import {
 } from 'lucide-react';
 
 const SubjectAllocationPage = () => {
-  const { selectedYear } = useAcademicYear();
+  const { academicYears, selectedYear } = useAcademicYear();
 
-  // Class Selection State
+  // Academic Year & Class Selection State
+  const [targetAcademicYearId, setTargetAcademicYearId] = useState('');
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [loadingClasses, setLoadingClasses] = useState(false);
+
+  const targetYear =
+    academicYears.find((y) => y._id === targetAcademicYearId) || selectedYear || null;
 
   // Allocations Table State
   const [allocations, setAllocations] = useState([]);
@@ -64,8 +68,21 @@ const SubjectAllocationPage = () => {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
 
-  // Status toggle loading
+  // Deallocate / Re-allocate Confirmation Modal State
+  const [deallocateModalOpen, setDeallocateModalOpen] = useState(false);
+  const [allocationToDeallocate, setAllocationToDeallocate] = useState(null);
+  const [deallocateSubmitting, setDeallocateSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
+
+  // Sync default target academic year from header context when available
+  useEffect(() => {
+    if (selectedYear?._id && !targetAcademicYearId) {
+      setTargetAcademicYearId(selectedYear._id);
+    } else if (academicYears.length > 0 && !targetAcademicYearId) {
+      const curr = academicYears.find((y) => y.isCurrent) || academicYears[0];
+      setTargetAcademicYearId(curr._id);
+    }
+  }, [selectedYear, academicYears]);
 
   // Load Classes when school session or year is active
   useEffect(() => {
@@ -74,13 +91,13 @@ const SubjectAllocationPage = () => {
 
   // When class or academic year changes, reset and fetch allocations
   useEffect(() => {
-    if (selectedClassId && selectedYear?._id) {
+    if (selectedClassId && targetYear?._id) {
       fetchAllocations(1);
     } else {
       setAllocations([]);
       setPagination({ currentPage: 1, totalPages: 1, totalRecords: 0, limit: 10 });
     }
-  }, [selectedClassId, selectedYear?._id, search, typeFilter, statusFilter]);
+  }, [selectedClassId, targetYear?._id, search, typeFilter, statusFilter]);
 
   const fetchActiveClasses = async () => {
     setLoadingClasses(true);
@@ -100,11 +117,11 @@ const SubjectAllocationPage = () => {
   };
 
   const fetchAllocations = async (page = 1) => {
-    if (!selectedClassId || !selectedYear?._id) return;
+    if (!selectedClassId || !targetYear?._id) return;
     setLoadingAllocations(true);
     try {
       const params = new URLSearchParams({
-        academicYearRef: selectedYear._id,
+        academicYearRef: targetYear._id,
         classRef: selectedClassId,
         page: page.toString(),
         limit: '10',
@@ -131,8 +148,8 @@ const SubjectAllocationPage = () => {
       setAlert({ type: 'error', message: 'Please select a class first.' });
       return;
     }
-    if (!selectedYear?._id) {
-      setAlert({ type: 'error', message: 'Please select an academic year from the header.' });
+    if (!targetYear?._id) {
+      setAlert({ type: 'error', message: 'Please select an academic year first.' });
       return;
     }
 
@@ -144,7 +161,7 @@ const SubjectAllocationPage = () => {
 
     try {
       const res = await api.get(
-        `/admin/class-subjects/available?academicYearRef=${selectedYear._id}&classRef=${selectedClassId}`
+        `/admin/class-subjects/available?academicYearRef=${targetYear._id}&classRef=${selectedClassId}`
       );
       if (res.success && res.subjects) {
         setAvailableSubjects(res.subjects);
@@ -312,7 +329,7 @@ const SubjectAllocationPage = () => {
     setAllocateSubmitting(true);
     try {
       const res = await api.post('/admin/class-subjects', {
-        academicYearRef: selectedYear._id,
+        academicYearRef: targetYear._id,
         classRef: selectedClassId,
         allocations: payloadAllocations
       });
@@ -415,25 +432,48 @@ const SubjectAllocationPage = () => {
     }
   };
 
-  // Toggle status
-  const handleToggleStatus = async (allocation) => {
-    const nextStatus = allocation.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    const confirmMsg =
-      nextStatus === 'INACTIVE'
-        ? `Are you sure you want to deactivate ${allocation.subjectName} for this class?`
-        : `Activate ${allocation.subjectName} for this class?`;
+  // Open Deallocate Confirmation Modal
+  const handleOpenDeallocateModal = (allocation) => {
+    setAllocationToDeallocate(allocation);
+    setDeallocateModalOpen(true);
+  };
 
-    if (!window.confirm(confirmMsg)) return;
+  // Confirm Deallocate Subject from Class
+  const handleConfirmDeallocate = async () => {
+    if (!allocationToDeallocate) return;
+    setDeallocateSubmitting(true);
+    try {
+      const res = await api.post(`/admin/class-subjects/${allocationToDeallocate._id}/deallocate`);
+      if (res.success) {
+        setAlert({
+          type: 'success',
+          message:
+            res.message ||
+            `Subject '${allocationToDeallocate.subjectName}' deallocated from ${currentClassDoc?.className || 'class'} for ${targetYear?.yearName || 'selected year'}.`
+        });
+        setDeallocateModalOpen(false);
+        setAllocationToDeallocate(null);
+        fetchAllocations(pagination.currentPage);
+      }
+    } catch (err) {
+      setAlert({ type: 'error', message: err.message });
+      setDeallocateModalOpen(false);
+    } finally {
+      setDeallocateSubmitting(false);
+    }
+  };
 
+  // Re-allocate an inactive subject allocation
+  const handleReactivateAllocation = async (allocation) => {
     setTogglingId(allocation._id);
     try {
       const res = await api.patch(`/admin/class-subjects/${allocation._id}/status`, {
-        status: nextStatus
+        status: 'ACTIVE'
       });
       if (res.success) {
         setAlert({
           type: 'success',
-          message: `Subject allocation status updated to ${nextStatus}.`
+          message: res.message || `Subject '${allocation.subjectName}' re-allocated to this class.`
         });
         fetchAllocations(pagination.currentPage);
       }
@@ -521,25 +561,33 @@ const SubjectAllocationPage = () => {
           >
             <Edit2 className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => handleToggleStatus(item)}
-            disabled={togglingId === item._id}
-            className={`p-1.5 rounded-lg transition-colors ${
-              item.status === 'ACTIVE'
-                ? 'text-slate-500 hover:text-amber-600 hover:bg-amber-50'
-                : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50'
-            }`}
-            title={item.status === 'ACTIVE' ? 'Deactivate Allocation' : 'Activate Allocation'}
-          >
-            {togglingId === item._id ? (
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            ) : item.status === 'ACTIVE' ? (
-              <XCircle className="w-4 h-4 text-amber-500" />
-            ) : (
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-            )}
-          </button>
+          {item.status === 'ACTIVE' ? (
+            <button
+              type="button"
+              onClick={() => handleOpenDeallocateModal(item)}
+              disabled={togglingId === item._id}
+              className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+              title="Deallocate subject from this class for the selected academic year"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              <span>Deallocate</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleReactivateAllocation(item)}
+              disabled={togglingId === item._id}
+              className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+              title="Re-allocate subject to this class"
+            >
+              {togglingId === item._id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle className="w-3.5 h-3.5" />
+              )}
+              <span>Re-allocate</span>
+            </button>
+          )}
         </div>
       )
     }
@@ -562,20 +610,32 @@ const SubjectAllocationPage = () => {
         {/* Academic Year & Class Selection Bar */}
         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            {/* Academic Year Info Banner */}
-            <div className="flex items-center space-x-3 p-3 bg-blue-50/70 border border-blue-200/60 rounded-lg">
+            {/* Academic Year Selector Dropdown */}
+            <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-600 text-white rounded-md shrink-0">
                 <Calendar className="w-5 h-5" />
               </div>
-              <div>
-                <p className="text-xs font-semibold text-blue-900 uppercase tracking-wider">
-                  Target Academic Year
-                </p>
-                <p className="text-sm font-bold text-blue-950">
-                  {selectedYear?.yearName || (
-                    <span className="text-amber-700 italic">No Academic Year Selected (Select in Header)</span>
+              <div className="flex-1">
+                <label htmlFor="ay-select" className="block text-[11px] font-bold text-blue-900 uppercase tracking-wider mb-1">
+                  Select Academic Year
+                </label>
+                <select
+                  id="ay-select"
+                  value={targetYear?._id || ''}
+                  onChange={(e) => setTargetAcademicYearId(e.target.value)}
+                  disabled={academicYears.length === 0}
+                  className="w-full px-3.5 py-2 bg-blue-50/50 border border-blue-200 rounded-lg text-sm font-semibold text-blue-950 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                >
+                  {academicYears.length === 0 ? (
+                    <option value="">No Academic Years Found</option>
+                  ) : (
+                    academicYears.map((ay) => (
+                      <option key={ay._id} value={ay._id}>
+                        {ay.yearName} {ay.isCurrent ? '(Active)' : ''}
+                      </option>
+                    ))
                   )}
-                </p>
+                </select>
               </div>
             </div>
 
@@ -689,7 +749,7 @@ const SubjectAllocationPage = () => {
           loading={loadingAllocations}
           emptyMessage={
             selectedClassId
-              ? `No subjects have been allocated to ${currentClassDoc?.className || 'this class'} for ${selectedYear?.yearName || 'the selected academic year'}. Click "+ Allocate Subjects" to get started.`
+              ? `No subjects have been allocated to ${currentClassDoc?.className || 'this class'} for ${targetYear?.yearName || 'the selected academic year'}. Click "+ Allocate Subjects" to get started.`
               : 'Please select a class to view its subject allocations.'
           }
         />
@@ -722,7 +782,7 @@ const SubjectAllocationPage = () => {
 
             <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center justify-between">
               <div>
-                Academic Year: <strong className="text-slate-800">{selectedYear?.yearName}</strong> | Class:{' '}
+                Academic Year: <strong className="text-slate-800">{targetYear?.yearName}</strong> | Class:{' '}
                 <strong className="text-slate-800">{currentClassDoc?.className}</strong>
               </div>
               <button
@@ -1058,6 +1118,66 @@ const SubjectAllocationPage = () => {
               </button>
             </div>
           </form>
+        </AdminModal>
+
+        {/* ======================================================== */}
+        {/* MODAL 3: CONFIRM SUBJECT DEALLOCATION                    */}
+        {/* ======================================================== */}
+        <AdminModal
+          isOpen={deallocateModalOpen}
+          onClose={() => !deallocateSubmitting && setDeallocateModalOpen(false)}
+          title="Confirm Subject Deallocation"
+          maxWidth="max-w-md"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start space-x-3 text-xs text-rose-900">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="space-y-1.5">
+                <p className="font-bold">
+                  Deallocate {allocationToDeallocate?.subjectName} ({allocationToDeallocate?.subjectCode})?
+                </p>
+                <p>
+                  This will deallocate the subject from{' '}
+                  <strong>{currentClassDoc?.className}</strong> for academic year{' '}
+                  <strong>{targetYear?.yearName}</strong>.
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>Teachers will no longer be able to enter new marks for this subject in this class &amp; year.</li>
+                  <li>Previous academic years, historical marks, and results will NOT be deleted.</li>
+                  <li>The subject remains in the school pool and can be re-allocated later if needed.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => setDeallocateModalOpen(false)}
+                disabled={deallocateSubmitting}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeallocate}
+                disabled={deallocateSubmitting}
+                className="inline-flex items-center space-x-1.5 px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs disabled:opacity-60 cursor-pointer"
+              >
+                {deallocateSubmitting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deallocating...</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Confirm Deallocate</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </AdminModal>
       </div>
     </DashboardLayout>

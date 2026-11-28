@@ -64,14 +64,27 @@ export const UserAuthProvider = ({ children }) => {
             }
           }
         } catch (err) {
-          console.warn('[UserAuth] Session expired or invalid:', err.message);
-          logoutUser();
+          // Only clear user session on explicit 401/403 auth failure; preserve session during temporary server outage
+          if (err.status === 401 || err.status === 403) {
+            console.warn('[UserAuth] Session expired or invalid:', err.message);
+            logoutUser();
+          } else {
+            console.warn('[UserAuth] Backend temporarily unreachable; preserving user session.');
+          }
         }
       }
       setLoading(false);
     };
 
     verifyUser();
+
+    const handleReconnected = () => {
+      if (userToken && isSchoolAuthenticated) {
+        verifyUser();
+      }
+    };
+    window.addEventListener('dmms:backend-reconnected', handleReconnected);
+    return () => window.removeEventListener('dmms:backend-reconnected', handleReconnected);
   }, [userToken, isSchoolAuthenticated]);
 
   const loginUser = (token, userData, initialPanel = null) => {

@@ -410,6 +410,7 @@ class StudentService {
     classRef,
     sectionRef,
     status,
+    enrollmentStatus,
     gender,
     search = '',
     page = 1,
@@ -439,6 +440,9 @@ class StudentService {
       }
       if (sectionRef && sectionRef !== 'ALL') {
         matchEnrollment.sectionRef = new mongoose.Types.ObjectId(sectionRef);
+      }
+      if (enrollmentStatus && enrollmentStatus !== 'ALL') {
+        matchEnrollment.status = enrollmentStatus.toUpperCase();
       }
 
       const pipeline = [
@@ -1765,6 +1769,96 @@ class StudentService {
     }
 
     return results;
+  }
+
+  /**
+   * List section/class transfer records scoped to school, academic year, and optional class/section
+   */
+  static async listSectionTransfers({ schoolId, academicYearRef, classRef, sectionRef }) {
+    const sId = schoolId.toUpperCase();
+
+    let targetAy = null;
+    if (academicYearRef && academicYearRef !== 'CURRENT' && academicYearRef !== 'ALL') {
+      targetAy = await AcademicYearInfo.findOne({ _id: academicYearRef, schoolId: sId }).lean();
+    } else {
+      targetAy = await AcademicYearInfo.findOne({ schoolId: sId, isCurrent: true }).lean();
+    }
+
+    const query = {
+      schoolId: sId,
+      changeType: { $in: ['SECTION_TRANSFER', 'CLASS_TRANSFER'] }
+    };
+
+    if (targetAy) {
+      query.academicYearRef = targetAy._id;
+    }
+
+    const hasClassFilter = classRef && classRef !== 'ALL';
+    const hasSectionFilter = sectionRef && sectionRef !== 'ALL';
+
+    if (hasClassFilter && hasSectionFilter) {
+      query.$or = [
+        { previousClassRef: classRef, previousSectionRef: sectionRef },
+        { newClassRef: classRef, newSectionRef: sectionRef }
+      ];
+    } else if (hasClassFilter) {
+      query.$or = [{ previousClassRef: classRef }, { newClassRef: classRef }];
+    }
+
+    const [records, classDoc, sectionDoc] = await Promise.all([
+      StudentEnrollmentHistoryInfo.find(query)
+        .populate('studentRef', 'admissionNumber firstName middleName lastName gender')
+        .populate('enrollmentRef', 'rollNumber status')
+        .populate('academicYearRef', 'yearName yearCode')
+        .populate('previousClassRef', 'className classCode')
+        .populate('previousSectionRef', 'sectionName sectionCode')
+        .populate('newClassRef', 'className classCode')
+        .populate('newSectionRef', 'sectionName sectionCode')
+        .sort({ changedAt: -1 })
+        .lean(),
+      hasClassFilter ? ClassInfo.findOne({ _id: classRef, schoolId: sId }).lean() : Promise.resolve(null),
+      hasSectionFilter ? SectionInfo.findOne({ _id: sectionRef, schoolId: sId }).lean() : Promise.resolve(null)
+    ]);
+
+    const transfers = records
+      .filter(r => r.studentRef)
+      .map(r => {
+        const stu = r.studentRef;
+        const fullName = [stu.firstName, stu.middleName, stu.lastName].filter(Boolean).join(' ');
+        const isIncoming =
+          hasSectionFilter && r.newSectionRef?._id?.toString() === sectionRef.toString();
+        const isOutgoing =
+          hasSectionFilter && r.previousSectionRef?._id?.toString() === sectionRef.toString();
+
+        return {
+          _id: r._id,
+          studentId: stu._id,
+          admissionNumber: stu.admissionNumber || '',
+          fullName,
+          gender: stu.gender || '',
+          rollNumber: r.enrollmentRef?.rollNumber || '',
+          academicYearName: r.academicYearRef?.yearName || r.academicYearRef?.yearCode || '',
+          fromClassName: r.previousClassRef?.className || '—',
+          fromSectionName: r.previousSectionRef?.sectionName || '—',
+          toClassName: r.newClassRef?.className || '—',
+          toSectionName: r.newSectionRef?.sectionName || '—',
+          direction: isIncoming ? 'INCOMING' : isOutgoing ? 'OUTGOING' : 'TRANSFER',
+          changeType: r.changeType,
+          remarks: r.remarks || '',
+          changedAt: r.changedAt || r.createdAt
+        };
+      });
+
+    return {
+      academicYear: targetAy
+        ? { _id: targetAy._id, yearName: targetAy.yearName, yearCode: targetAy.yearCode }
+        : null,
+      class: classDoc ? { _id: classDoc._id, className: classDoc.className, classCode: classDoc.classCode } : null,
+      section: sectionDoc
+        ? { _id: sectionDoc._id, sectionName: sectionDoc.sectionName, sectionCode: sectionDoc.sectionCode }
+        : null,
+      transfers
+    };
   }
 }
 

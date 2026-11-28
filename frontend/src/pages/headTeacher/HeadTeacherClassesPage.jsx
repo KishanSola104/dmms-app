@@ -18,7 +18,8 @@ import {
   Building,
   CheckCircle2,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  Download
 } from 'lucide-react';
 
 const HeadTeacherClassesPage = () => {
@@ -43,6 +44,44 @@ const HeadTeacherClassesPage = () => {
   const [selectedSectionData, setSelectedSectionData] = useState(null);
   const [sectionModalOpen, setSectionModalOpen] = useState(false);
   const [sectionModalLoading, setSectionModalLoading] = useState(false);
+  const [rosterExportError, setRosterExportError] = useState('');
+
+  const handleExportSectionRosterPdf = async () => {
+    const sec = selectedSectionData?.sectionDetails;
+    const ayId = selectedSectionData?.selectedAcademicYear?._id || selectedYear?._id;
+    if (!sec?.parentClassId || !sec?._id || !ayId) return;
+    setRosterExportError('');
+    try {
+      const res = await fetch(
+        `/api/admin/classes/${sec.parentClassId}/sections/${sec._id}/export/pdf?academicYearRef=${ayId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('dmms_user_token') || ''}`,
+            'x-school-token': localStorage.getItem('dmms_school_token') || ''
+          }
+        }
+      );
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Failed to export section roster PDF.');
+      }
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const fileName = match ? match[1] : `Enrollment_Roster_${sec.sectionCode || 'Section'}.pdf`;
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setRosterExportError(err.message || 'Failed to export section roster PDF.');
+    }
+  };
 
   const fetchClasses = async (page = 1) => {
     setLoading(true);
@@ -432,14 +471,30 @@ const HeadTeacherClassesPage = () => {
 
               {/* Enrolled Students Table */}
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Enrolled Student Roster ({selectedSectionData.students?.length || 0})
-                  </h4>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Session {selectedSectionData.selectedAcademicYear?.yearCode} Active Roster
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Enrolled Student Roster ({selectedSectionData.students?.length || 0})
+                    </h4>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Session {selectedSectionData.selectedAcademicYear?.yearCode} Active Roster
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportSectionRosterPdf}
+                    disabled={!selectedSectionData.students || selectedSectionData.students.length === 0}
+                    className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs disabled:opacity-50 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                    <span>Export Roster PDF</span>
+                  </button>
                 </div>
+                {rosterExportError && (
+                  <div className="mb-3 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+                    {rosterExportError}
+                  </div>
+                )}
 
                 <div className="overflow-x-auto border border-slate-200 rounded-xl max-h-80 overflow-y-auto">
                   <table className="w-full text-xs text-left">

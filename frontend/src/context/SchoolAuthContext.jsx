@@ -21,14 +21,27 @@ export const SchoolAuthProvider = ({ children }) => {
             localStorage.setItem('dmms_school_info', JSON.stringify(res.school));
           }
         } catch (err) {
-          console.warn('[SchoolAuth] Session expired or invalid:', err.message);
-          logoutSchool();
+          // Only clear session on explicit 401/403 authentication rejection; preserve tokens if backend is temporarily offline
+          if (err.status === 401 || err.status === 403) {
+            console.warn('[SchoolAuth] Session expired or invalid:', err.message);
+            logoutSchool();
+          } else {
+            console.warn('[SchoolAuth] Backend temporarily unreachable; preserving school session.');
+          }
         }
       }
       setLoading(false);
     };
 
     verifySchool();
+
+    const handleReconnected = () => {
+      if (schoolToken) {
+        verifySchool();
+      }
+    };
+    window.addEventListener('dmms:backend-reconnected', handleReconnected);
+    return () => window.removeEventListener('dmms:backend-reconnected', handleReconnected);
   }, [schoolToken]);
 
   const loginSchool = (token, schoolData) => {

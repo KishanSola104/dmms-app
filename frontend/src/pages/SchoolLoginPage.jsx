@@ -3,12 +3,14 @@ import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
+import { useBackendHealth } from '../context/BackendHealthContext';
 import api from '../services/api';
-import { Building2, KeyRound, ArrowRight, AlertCircle, Loader2, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { Building2, KeyRound, ArrowRight, AlertCircle, Loader2, HelpCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 
 const SchoolLoginPage = () => {
   const navigate = useNavigate();
   const { loginSchool } = useSchoolAuth();
+  const { refreshApp } = useBackendHealth();
 
   const [schoolId, setSchoolId] = useState('');
   const [password, setPassword] = useState('');
@@ -177,13 +179,27 @@ const SchoolLoginPage = () => {
               </button>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center space-y-3">
               <p className="text-xs text-slate-500">
                 School not registered yet?{' '}
                 <Link to="/register-school" className="text-blue-600 hover:text-blue-800 font-semibold">
                   Register Your School
                 </Link>
               </p>
+              <div className="flex items-center justify-center gap-3 text-xs">
+                <button
+                  type="button"
+                  onClick={() => refreshApp({ reloadPage: true })}
+                  className="inline-flex items-center space-x-1 text-slate-600 hover:text-blue-600 font-semibold cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh App</span>
+                </button>
+                <span className="text-slate-300">|</span>
+                <Link to="/refresh-app" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  Recovery &amp; Status
+                </Link>
+              </div>
             </div>
 
           </div>
@@ -234,28 +250,38 @@ const SchoolLoginPage = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-end space-x-2 pt-2">
+                <div className="flex items-center justify-between pt-2">
                   <button
                     type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                    onClick={() => refreshApp({ reloadPage: true })}
+                    className="inline-flex items-center space-x-1 text-xs font-semibold text-slate-600 hover:text-blue-600 cursor-pointer"
                   >
-                    Cancel
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refresh App</span>
                   </button>
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs flex items-center space-x-1.5"
-                  >
-                    {forgotLoading ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <span>Request Password</span>
-                    )}
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(false)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs flex items-center space-x-1.5"
+                    >
+                      {forgotLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <span>Request Password</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : (

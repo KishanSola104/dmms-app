@@ -1,16 +1,18 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useUserAuth } from '../context/UserAuthContext';
-import { ArrowRight, LogIn, CheckCircle2, Shield, Award, Users, BookOpen } from 'lucide-react';
+import { useBackendHealth } from '../context/BackendHealthContext';
+import { ArrowRight, LogIn, CheckCircle2, Shield, Award, Users, BookOpen, RefreshCw } from 'lucide-react';
 import homeImg from '../assets/home-image.png';
 
 const HomePage = () => {
   const navigate = useNavigate();
   const { isSchoolAuthenticated } = useSchoolAuth();
   const { isUserAuthenticated } = useUserAuth();
+  const { isBackendOnline, refreshApp } = useBackendHealth();
 
   const handleLoginClick = () => {
     if (isUserAuthenticated) {
@@ -91,6 +93,27 @@ const HomePage = () => {
                   <LogIn className="w-4 h-4 text-slate-600" />
                   <span>Login</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => refreshApp({ reloadPage: true })}
+                  className="w-full sm:w-auto px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl border border-slate-200 transition-all flex items-center justify-center space-x-2 cursor-pointer"
+                  title="Refresh frontend and verify DMMS server connection"
+                >
+                  <RefreshCw className="w-4 h-4 text-blue-600" />
+                  <span>Refresh App</span>
+                </button>
+              </div>
+
+              <div className="text-xs text-slate-500 flex items-center justify-center lg:justify-start gap-3">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${isBackendOnline ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  <span>{isBackendOnline ? 'Server Online' : 'Reconnecting to server...'}</span>
+                </span>
+                <span>&bull;</span>
+                <Link to="/refresh-app" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  Open Recovery &amp; Status Page
+                </Link>
               </div>
 
               {/* User Roles Ribbon */}

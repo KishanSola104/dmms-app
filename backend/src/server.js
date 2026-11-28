@@ -3,6 +3,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 require('dotenv').config(); // Fallback
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const seedRoles = require('./seed/seedRoles');
 const errorHandler = require('./middlewares/error.middleware');
@@ -18,7 +19,8 @@ const teacherRoutes = require('./routes/teacher.routes');
 const officeRoutes = require('./routes/office.routes');
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = Number(process.env.PORT) || 8000;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Connect to Database
 connectDB().then(async () => {
@@ -37,10 +39,45 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded profile images statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
+// Health check endpoint (verifies backend & MongoDB availability)
+app.get('/api/health', async (req, res) => {
+  const readyState = mongoose.connection.readyState;
+  const stateMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+
+  let dbHealthy = false;
+  if (readyState === 1 && mongoose.connection.db) {
+    try {
+      await Promise.race([
+        mongoose.connection.db.admin().ping(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('DB ping timeout')), 2000))
+      ]);
+      dbHealthy = true;
+    } catch {
+      dbHealthy = false;
+    }
+  }
+
+  if (!dbHealthy) {
+    return res.status(503).json({
+      success: false,
+      status: 'degraded',
+      database: stateMap[readyState] || 'disconnected',
+      system: 'Digital Marksheet Management System (DMMS)',
+      version: '1.0.0',
+      message: 'DMMS is temporarily unavailable. Please wait while the system reconnects.',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  return res.json({
+    success: true,
     status: 'online',
+    database: 'connected',
     system: 'Digital Marksheet Management System (DMMS)',
     version: '1.0.0',
     timestamp: new Date().toISOString()
@@ -61,6 +98,6 @@ app.use('/api/office', officeRoutes);
 app.use(errorHandler);
 
 // Start Server
-app.listen(PORT, () => {
-  console.log(`[DMMS Backend] Server running on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`[DMMS Backend] Server running on http://${HOST}:${PORT}`);
 });

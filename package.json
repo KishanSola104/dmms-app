@@ -5,6 +5,10 @@
   "scripts": {
     "backend": "cd backend && npm run dev",
     "frontend": "cd frontend && npm run dev",
+    "start:prod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-dmms.ps1",
+    "stop:prod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-dmms.ps1",
+    "status:prod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/status-dmms.ps1",
+    "install:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-autostart.ps1",
     "test:e2e": "cd backend && node test_e2e.js",
     "build": "cd frontend && npm run build"
   },

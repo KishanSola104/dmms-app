@@ -23,7 +23,8 @@ import {
   ArrowRight,
   UserCheck,
   Shield,
-  Info
+  Info,
+  Download
 } from 'lucide-react';
 
 const HeadTeacherStudentListPage = () => {
@@ -194,6 +195,53 @@ const HeadTeacherStudentListPage = () => {
     setViewModalOpen(true);
   };
 
+  // Export Students to Excel (respecting active filters)
+  const handleExportExcel = async () => {
+    if (students.length === 0 || pagination.totalRecords === 0) {
+      setError('No student records match the selected filters to export.');
+      return;
+    }
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (selectedYear?._id) params.append('academicYearRef', selectedYear._id);
+      if (selectedClassId && selectedClassId !== 'ALL') params.append('classRef', selectedClassId);
+      if (selectedSectionId && selectedSectionId !== 'ALL') params.append('sectionRef', selectedSectionId);
+      if (selectedGender && selectedGender !== 'ALL') params.append('gender', selectedGender);
+      if (selectedEnrollmentStatus && selectedEnrollmentStatus !== 'ALL') {
+        params.append('enrollmentStatus', selectedEnrollmentStatus);
+      }
+      if (debouncedSearch) params.append('search', debouncedSearch);
+
+      const res = await fetch(`/api/admin/students/export/excel?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('dmms_user_token') || ''}`,
+          'x-school-token': localStorage.getItem('dmms_school_token') || ''
+        }
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Failed to export students to Excel.');
+      }
+
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const fileName = match ? match[1] : `DMMS_Students_Directory_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || 'Export failed.');
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-in fade-in duration-200">
@@ -218,23 +266,34 @@ const HeadTeacherStudentListPage = () => {
               </p>
             </div>
 
-            {/* Academic Year Notice from Header */}
-            <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 shrink-0">
-              <Calendar className="w-5 h-5 text-blue-600 mr-3 shrink-0" />
-              <div>
-                <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                  Active Academic Year
-                </div>
-                <div className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
-                  <span>{selectedYear?.yearName || selectedYear?.yearCode || 'Loading...'}</span>
-                  {selectedYear?.isCurrent && (
-                    <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[10px] font-medium border border-emerald-200">
-                      Current
-                    </span>
-                  )}
-                </div>
-                <div className="text-[10px] text-slate-400">
-                  Switch year using header selector
+            {/* Academic Year Notice & Export Excel Action */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="inline-flex items-center justify-center px-3.5 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4 mr-1.5 text-slate-600" />
+                <span>Export Excel</span>
+              </button>
+
+              <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 shrink-0">
+                <Calendar className="w-5 h-5 text-blue-600 mr-3 shrink-0" />
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    Active Academic Year
+                  </div>
+                  <div className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                    <span>{selectedYear?.yearName || selectedYear?.yearCode || 'Loading...'}</span>
+                    {selectedYear?.isCurrent && (
+                      <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[10px] font-medium border border-emerald-200">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Switch year using header selector
+                  </div>
                 </div>
               </div>
             </div>

@@ -235,13 +235,16 @@ const StudentProfilePage = () => {
 
   const handleExportPDF = async () => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/admin/students/${student._id}/export/pdf`, {
+      const res = await fetch(`/api/admin/students/${student._id}/export/pdf`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'x-school-token': localStorage.getItem('schoolToken') || ''
+          Authorization: `Bearer ${localStorage.getItem('dmms_user_token') || ''}`,
+          'x-school-token': localStorage.getItem('dmms_school_token') || ''
         }
       });
-      if (!res.ok) throw new Error('Failed to generate PDF.');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || 'Failed to generate PDF.');
+      }
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
+import { useBackendHealth } from '../context/BackendHealthContext';
 import api from '../services/api';
 import {
   Building2,
@@ -19,11 +20,13 @@ import {
   Globe,
   MapPin,
   AlertCircle,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 const SchoolRegisterPage = () => {
   const navigate = useNavigate();
+  const { refreshApp } = useBackendHealth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -473,6 +476,22 @@ const SchoolRegisterPage = () => {
                   <p className="text-xs sm:text-sm text-slate-400 mt-1">
                     Complete all 4 steps to set up your institution on DMMS
                   </p>
+                  <div className="mt-3 flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => refreshApp({ reloadPage: true })}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Refresh App</span>
+                    </button>
+                    <Link
+                      to="/refresh-app"
+                      className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 underline"
+                    >
+                      Connection Status
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Stepper Indicator */}

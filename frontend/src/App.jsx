@@ -1,8 +1,10 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BackendHealthProvider } from './context/BackendHealthContext';
 import { SchoolAuthProvider } from './context/SchoolAuthContext';
 import { UserAuthProvider } from './context/UserAuthContext';
 import { AcademicYearProvider } from './context/AcademicYearContext';
+import BackendStatusBanner from './components/BackendStatusBanner';
 
 // Guards
 import SchoolProtectedRoute from './components/SchoolProtectedRoute';
@@ -85,20 +87,24 @@ import TeacherExaminationResultsPage from './pages/teacher/TeacherExaminationRes
 import TeacherFinalResultPage from './pages/teacher/TeacherFinalResultPage';
 import TeacherResultPerformancePage from './pages/teacher/TeacherResultPerformancePage';
 
-// Common 404 Page
+// Common 404 & Recovery Pages
+import RefreshAppPage from './pages/RefreshAppPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
   return (
-    <SchoolAuthProvider>
-      <UserAuthProvider>
-        <AcademicYearProvider>
-          <BrowserRouter>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/register-school" element={<SchoolRegisterPage />} />
-              <Route path="/school-login" element={<SchoolLoginPage />} />
+    <BackendHealthProvider>
+      <SchoolAuthProvider>
+        <UserAuthProvider>
+          <AcademicYearProvider>
+            <BrowserRouter>
+              <BackendStatusBanner />
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<HomePage />} />
+                <Route path="/register-school" element={<SchoolRegisterPage />} />
+                <Route path="/school-login" element={<SchoolLoginPage />} />
+                <Route path="/refresh-app" element={<RefreshAppPage />} />
 
               {/* School Session Protected Route */}
               <Route
@@ -594,6 +600,7 @@ function App() {
         </AcademicYearProvider>
       </UserAuthProvider>
     </SchoolAuthProvider>
+    </BackendHealthProvider>
   );
 }
 

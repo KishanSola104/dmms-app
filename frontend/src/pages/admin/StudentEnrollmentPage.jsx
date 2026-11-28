@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 const StudentEnrollmentPage = () => {
-  const { academicYears, selectedAcademicYear } = useAcademicYear();
+  const { academicYears, selectedYear } = useAcademicYear();
 
   // Top Filters
   const [academicYearId, setAcademicYearId] = useState('');
@@ -32,10 +32,14 @@ const StudentEnrollmentPage = () => {
   const [sections, setSections] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
+  const [activeTab, setActiveTab] = useState('ENROLLMENT'); // 'ENROLLMENT' | 'TRANSFERS'
+  const [transferSectionFilter, setTransferSectionFilter] = useState('SELECTED'); // 'SELECTED' | 'ALL'
 
   // Data
   const [summaryData, setSummaryData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [transfers, setTransfers] = useState([]);
+  const [transfersLoading, setTransfersLoading] = useState(false);
   const [alert, setAlert] = useState({ type: '', message: '' });
 
   // Enroll Unenrolled Student Modal State
@@ -68,13 +72,13 @@ const StudentEnrollmentPage = () => {
 
   // Auto-select academic year
   useEffect(() => {
-    if (selectedAcademicYear?._id && !academicYearId) {
-      setAcademicYearId(selectedAcademicYear._id);
+    if (selectedYear?._id && !academicYearId) {
+      setAcademicYearId(selectedYear._id);
     } else if (academicYears.length > 0 && !academicYearId) {
       const current = academicYears.find((y) => y.isCurrent) || academicYears[0];
       setAcademicYearId(current._id);
     }
-  }, [selectedAcademicYear, academicYears]);
+  }, [selectedYear, academicYears]);
 
   // Load Classes
   useEffect(() => {
@@ -128,6 +132,15 @@ const StudentEnrollmentPage = () => {
     }
   }, [academicYearId, selectedClassId, selectedSectionId]);
 
+  // Fetch Section Transfer Records when on Transfers tab or filters change
+  useEffect(() => {
+    if (academicYearId) {
+      fetchSectionTransfers();
+    } else {
+      setTransfers([]);
+    }
+  }, [academicYearId, selectedClassId, selectedSectionId, transferSectionFilter]);
+
   const fetchSectionSummary = async () => {
     setLoading(true);
     try {
@@ -142,6 +155,29 @@ const StudentEnrollmentPage = () => {
       setSummaryData(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSectionTransfers = async () => {
+    if (!academicYearId) return;
+    setTransfersLoading(true);
+    try {
+      const params = new URLSearchParams({ academicYearRef: academicYearId });
+      if (selectedClassId) params.append('classRef', selectedClassId);
+      if (transferSectionFilter === 'SELECTED' && selectedSectionId) {
+        params.append('sectionRef', selectedSectionId);
+      } else {
+        params.append('sectionRef', 'ALL');
+      }
+      const res = await api.get(`/admin/enrollments/transfers?${params.toString()}`);
+      if (res.success) {
+        setTransfers(res.transfers || []);
+      }
+    } catch (err) {
+      setAlert({ type: 'error', message: err.message || 'Failed to load section transfer records.' });
+      setTransfers([]);
+    } finally {
+      setTransfersLoading(false);
     }
   };
 
@@ -266,6 +302,7 @@ const StudentEnrollmentPage = () => {
         });
         setTransferModalOpen(false);
         fetchSectionSummary();
+        fetchSectionTransfers();
       }
     } catch (err) {
       setTransferError(err.message || 'Failed to transfer student.');
@@ -307,24 +344,75 @@ const StudentEnrollmentPage = () => {
     }
   };
 
+  const downloadPdfResponse = async (url, fallbackFilename) => {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('dmms_user_token') || ''}`,
+        'x-school-token': localStorage.getItem('dmms_school_token') || ''
+      }
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.message || 'Failed to generate roster PDF.');
+    }
+
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    const fileName = match ? match[1] : fallbackFilename;
+
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+  };
+
   const handleExportRosterPDF = async () => {
-    if (!selectedClassId || !selectedSectionId) return;
+    if (!selectedClassId || !selectedSectionId) {
+      setAlert({ type: 'error', message: 'Please select a class and section first.' });
+      return;
+    }
+    if (!summaryData || !summaryData.enrollments || summaryData.enrollments.length === 0) {
+      setAlert({ type: 'error', message: 'No enrolled students found in this section to export.' });
+      return;
+    }
     try {
-      const res = await fetch(
-        `http://127.0.0.1:8000/api/admin/classes/${selectedClassId}/sections/${selectedSectionId}/export/pdf?academicYearRef=${academicYearId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'x-school-token': localStorage.getItem('schoolToken') || ''
-          }
-        }
+      await downloadPdfResponse(
+        `/api/admin/classes/${selectedClassId}/sections/${selectedSectionId}/export/pdf?academicYearRef=${academicYearId}`,
+        `Enrollment_Roster_${summaryData.class?.className || 'Class'}_${summaryData.section?.sectionName || 'Section'}.pdf`
       );
-      if (!res.ok) throw new Error('Failed to generate roster PDF.');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
     } catch (err) {
       setAlert({ type: 'error', message: err.message || 'PDF roster export failed.' });
+    }
+  };
+
+  const handleExportTransferRosterPDF = async () => {
+    if (!academicYearId) {
+      setAlert({ type: 'error', message: 'Please select an academic year first.' });
+      return;
+    }
+    if (transfers.length === 0) {
+      setAlert({ type: 'error', message: 'No section transfer records match the selected filters to export.' });
+      return;
+    }
+    try {
+      const params = new URLSearchParams({ academicYearRef: academicYearId });
+      if (selectedClassId) params.append('classRef', selectedClassId);
+      if (transferSectionFilter === 'SELECTED' && selectedSectionId) {
+        params.append('sectionRef', selectedSectionId);
+      } else {
+        params.append('sectionRef', 'ALL');
+      }
+      await downloadPdfResponse(
+        `/api/admin/enrollments/transfers/export/pdf?${params.toString()}`,
+        `Section_Transfer_Roster.pdf`
+      );
+    } catch (err) {
+      setAlert({ type: 'error', message: err.message || 'Section transfer PDF export failed.' });
     }
   };
 
@@ -345,20 +433,32 @@ const StudentEnrollmentPage = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={handleExportRosterPDF}
-              disabled={!summaryData || summaryData.enrollments?.length === 0}
-              className="inline-flex items-center justify-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-xs transition-all disabled:opacity-50"
-            >
-              <Download className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
-              <span>Export Roster PDF</span>
-            </button>
+            {activeTab === 'ENROLLMENT' ? (
+              <button
+                type="button"
+                onClick={handleExportRosterPDF}
+                disabled={!summaryData || summaryData.enrollments?.length === 0}
+                className="inline-flex items-center justify-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                <span>Export Roster PDF</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleExportTransferRosterPDF}
+                disabled={transfers.length === 0}
+                className="inline-flex items-center justify-center px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                <span>Export Transfer Roster PDF</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleOpenEnrollModal}
               disabled={!selectedSectionId || capacity?.isFull}
-              className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all disabled:opacity-50"
+              className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-all disabled:opacity-50 cursor-pointer"
             >
               <Plus className="w-4 h-4 mr-1.5" />
               <span>Enroll Student</span>
@@ -457,6 +557,50 @@ const StudentEnrollmentPage = () => {
           </div>
         </div>
 
+        {/* Tabs: Enrollment Roster vs Section Transfer Records */}
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-2xl p-2 shadow-2xs">
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('ENROLLMENT')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                activeTab === 'ENROLLMENT'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Enrollment Roster ({summaryData?.enrollments?.length || 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('TRANSFERS')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                activeTab === 'TRANSFERS'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              Section Transfer Records ({transfers.length})
+            </button>
+          </div>
+
+          {activeTab === 'TRANSFERS' && (
+            <div className="flex items-center space-x-2 pr-2">
+              <span className="text-xs font-semibold text-slate-500">Scope:</span>
+              <select
+                value={transferSectionFilter}
+                onChange={(e) => setTransferSectionFilter(e.target.value)}
+                className="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-slate-50 font-semibold text-slate-800"
+              >
+                <option value="SELECTED">Selected Section Only</option>
+                <option value="ALL">All Sections in Class</option>
+              </select>
+            </div>
+          )}
+        </div>
+
+        {activeTab === 'ENROLLMENT' ? (
+        <>
         {/* Capacity & Statistics Banner */}
         {capacity && (
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
@@ -646,6 +790,84 @@ const StudentEnrollmentPage = () => {
             </table>
           </div>
         </div>
+        </>
+        ) : (
+        /* Section Transfer Records Table */
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center space-x-2">
+              <ArrowRightLeft className="w-5 h-5 text-blue-600" />
+              <h2 className="text-sm font-bold text-slate-800">
+                Section Transfer Records
+                <span className="ml-2 text-xs font-normal text-slate-500">
+                  ({transfers.length} transfer{transfers.length === 1 ? '' : 's'})
+                </span>
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={handleExportTransferRosterPDF}
+              disabled={transfers.length === 0}
+              className="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg disabled:opacity-50 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+              <span>Export Transfer Roster PDF</span>
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Adm No</th>
+                  <th className="py-3.5 px-4">Student Name</th>
+                  <th className="py-3.5 px-4">From (Class - Sec)</th>
+                  <th className="py-3.5 px-4">To (Class - Sec)</th>
+                  <th className="py-3.5 px-4">Transfer Date</th>
+                  <th className="py-3.5 px-4">Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {transfersLoading ? (
+                  <tr>
+                    <td colSpan="6" className="py-12 text-center text-slate-500">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+                      <span>Loading section transfer records...</span>
+                    </td>
+                  </tr>
+                ) : transfers.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-12 text-center text-slate-500">
+                      No section transfer records found for the selected academic year, class, and section.
+                    </td>
+                  </tr>
+                ) : (
+                  transfers.map((tr) => (
+                    <tr key={tr._id} className="hover:bg-slate-50/60">
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-700">
+                        <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          {tr.admissionNumber}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{tr.fullName}</td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {tr.fromClassName} - {tr.fromSectionName}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-blue-700">
+                        {tr.toClassName} - {tr.toSectionName}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {tr.changedAt ? new Date(tr.changedAt).toLocaleDateString('en-GB') : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600">{tr.remarks || '—'}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        )}
 
         {/* ENROLL UNENROLLED STUDENT MODAL */}
         <AdminModal

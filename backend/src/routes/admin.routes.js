@@ -79,6 +79,7 @@ router.get('/class-subjects/available', adminOrHeadTeacher, AdminClassSubjectCon
 router.post('/class-subjects', adminOrHeadTeacher, AdminClassSubjectController.allocateSubjects);
 router.put('/class-subjects/:allocationId', adminOrHeadTeacher, AdminClassSubjectController.updateAllocation);
 router.patch('/class-subjects/:allocationId/status', adminOrHeadTeacher, AdminClassSubjectController.toggleAllocationStatus);
+router.post('/class-subjects/:allocationId/deallocate', adminOrHeadTeacher, AdminClassSubjectController.deallocateAllocation);
 
 // ==========================================
 // 6. MODULE 3 - TEACHER ASSIGNMENT TO SUBJECTS (ADMIN & HEAD TEACHER)
@@ -125,6 +126,8 @@ router.patch('/students/:studentId/status', adminOrHeadTeacher, AdminStudentCont
 // 10. MODULE 4 - ENROLLMENT & TRANSFER MANAGEMENT (ADMIN & HEAD TEACHER)
 // ==========================================
 router.get('/enrollments', adminOrHeadTeacher, AdminStudentController.getSectionEnrollmentSummary);
+router.get('/enrollments/transfers', adminOrHeadTeacher, AdminStudentImportExportController.listSectionTransfers);
+router.get('/enrollments/transfers/export/pdf', adminOrHeadTeacher, AdminStudentImportExportController.exportSectionTransferRosterPDF);
 router.get('/enrollments/unenrolled', adminOrHeadTeacher, AdminStudentController.getUnenrolledStudents);
 router.post('/enrollments', adminOrHeadTeacher, AdminStudentController.enrollStudent);
 router.put('/enrollments/:enrollmentId', adminOrHeadTeacher, AdminStudentController.updateEnrollment);

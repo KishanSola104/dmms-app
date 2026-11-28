@@ -954,7 +954,7 @@ class StudentImportExportService {
   /**
    * 4. Export Students to Excel
    */
-  static async exportStudentsToExcel({ schoolId, academicYearRef, classRef, sectionRef, status, gender, search }) {
+  static async exportStudentsToExcel({ schoolId, academicYearRef, classRef, sectionRef, status, enrollmentStatus, gender, search }) {
     const sId = schoolId.toUpperCase();
     const result = await StudentService.listStudents({
       schoolId: sId,
@@ -962,6 +962,7 @@ class StudentImportExportService {
       classRef,
       sectionRef,
       status,
+      enrollmentStatus,
       gender,
       search,
       page: 1,
@@ -969,6 +970,11 @@ class StudentImportExportService {
     });
 
     const students = result.students || [];
+    if (students.length === 0) {
+      const err = new Error('No student records found matching the selected filters.');
+      err.statusCode = 404;
+      throw err;
+    }
 
     const headers = [
       'Admission Number',
@@ -982,6 +988,7 @@ class StudentImportExportService {
       'Class',
       'Section',
       'Roll Number',
+      'Enrollment Status',
       'Primary Guardian Name',
       'Guardian Relationship',
       'Guardian Mobile',
@@ -993,28 +1000,51 @@ class StudentImportExportService {
     ];
 
     const rows = students.map((s) => [
-      s.admissionNumber,
-      s.fullName,
-      s.firstName,
-      s.middleName,
-      s.lastName,
-      s.gender,
+      s.admissionNumber || '',
+      s.fullName || '',
+      s.firstName || '',
+      s.middleName || '',
+      s.lastName || '',
+      s.gender || '',
       s.dateOfBirth ? new Date(s.dateOfBirth).toISOString().split('T')[0] : '',
-      s.academicYearName,
-      s.className,
-      s.sectionName,
+      s.academicYearName || '',
+      s.className || '',
+      s.sectionName || '',
       s.rollNumber || '',
+      s.enrollmentStatus || '',
       s.primaryGuardian?.fullName || '',
       s.primaryGuardian?.relationship || '',
       s.primaryGuardian?.mobileNumber || '',
       s.primaryGuardian?.email || '',
       s.studentPhone || '',
       s.studentEmail || '',
-      s.status,
+      s.status || '',
       s.admissionDate ? new Date(s.admissionDate).toISOString().split('T')[0] : ''
     ]);
 
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = [
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 10 },
+      { wch: 13 },
+      { wch: 15 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 15 },
+      { wch: 24 },
+      { wch: 12 },
+      { wch: 14 }
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Students');
 
@@ -1107,70 +1137,370 @@ class StudentImportExportService {
   }
 
   /**
-   * 6. Export Class/Section Student List to PDF
+   * 6. Export Class/Section Student Enrollment Roster to PDF
    */
   static async exportClassListToPDF({ schoolId, academicYearRef, classRef, sectionRef }) {
     const sId = schoolId.toUpperCase();
-    const [summary, school] = await Promise.all([
+    const [summary, transferData, school] = await Promise.all([
       StudentService.getSectionEnrollmentSummary({ schoolId: sId, academicYearRef, classRef, sectionRef }),
+      StudentService.listSectionTransfers({ schoolId: sId, academicYearRef, classRef, sectionRef }),
       SchoolInfo.findOne({ schoolId: sId }).lean()
     ]);
 
+    const enrollments = summary.enrollments || [];
+    if (enrollments.length === 0) {
+      const err = new Error('No enrolled students found for the selected class, section, and academic year.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const transfers = transferData?.transfers || [];
+
     return new Promise((resolve, reject) => {
       try {
-        const doc = new PDFDocument({ margin: 40, size: 'A4' });
+        const doc = new PDFDocument({ margin: 36, size: 'A4', bufferPages: true });
         const buffers = [];
 
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', () => resolve(Buffer.concat(buffers)));
 
-        // Header
-        doc.fontSize(16).font('Helvetica-Bold').text(school?.schoolName || 'DIGITAL MARKSHEET MANAGEMENT SYSTEM', { align: 'center' });
-        doc.fontSize(10).font('Helvetica').text(school?.address || '', { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(13).font('Helvetica-Bold').fillColor('#1e40af').text(
-          `STUDENT ROSTER: ${summary.class.className} - ${summary.section.sectionName} (${summary.academicYear.yearName})`,
-          { align: 'center' }
-        );
-        doc.moveDown(0.5);
-        doc.strokeColor('#cbd5e1').lineWidth(1).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-        doc.moveDown(1);
+        const pageWidth = doc.page.width - 72; // 595.28 - 72 = 523.28
+        const leftX = 36;
+        const rightX = leftX + pageWidth;
+        const bottomLimit = doc.page.height - 54;
 
-        doc.fillColor('#0f172a').fontSize(9).font('Helvetica');
-        doc.text(`Total Enrolled: ${summary.capacity.totalEnrolled} | Active: ${summary.capacity.activeEnrolled} | Capacity: ${summary.capacity.maxCapacity}`);
-        doc.moveDown(0.8);
-
-        // Table Header
-        let y = doc.y;
-        doc.fontSize(9).font('Helvetica-Bold').fillColor('#1e3a8a');
-        doc.text('Roll', 40, y);
-        doc.text('Adm No', 80, y);
-        doc.text('Student Name', 160, y);
-        doc.text('Gender', 340, y);
-        doc.text('Enrollment Date', 410, y);
-        doc.text('Status', 490, y);
-        y += 15;
-        doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(40, y).lineTo(555, y).stroke();
-        y += 6;
-
-        // Rows
-        doc.font('Helvetica').fontSize(8).fillColor('#0f172a');
-        (summary.enrollments || []).forEach((enr) => {
-          if (y > 750) {
-            doc.addPage();
-            y = 40;
+        const drawHeader = () => {
+          doc.rect(0, 0, doc.page.width, doc.page.height).fill('#ffffff');
+          doc.fillColor('#0f172a').fontSize(15).font('Helvetica-Bold').text(
+            (school?.schoolName || 'DIGITAL MARKSHEET MANAGEMENT SYSTEM').toUpperCase(),
+            leftX,
+            30,
+            { width: pageWidth, align: 'center' }
+          );
+          if (school?.address) {
+            doc.fontSize(8.5).font('Helvetica').fillColor('#475569').text(school.address, leftX, doc.y + 2, {
+              width: pageWidth,
+              align: 'center'
+            });
           }
-          doc.text(enr.rollNumber ? '#' + enr.rollNumber : '—', 40, y);
-          doc.text(enr.admissionNumber, 80, y);
-          doc.text(enr.fullName, 160, y);
-          doc.text(enr.gender, 340, y);
-          doc.text(enr.enrollmentDate ? new Date(enr.enrollmentDate).toLocaleDateString('en-GB') : '—', 410, y);
-          doc.text(enr.status, 490, y);
-          y += 16;
+          doc.moveDown(0.35);
+          doc.fontSize(11.5).font('Helvetica-Bold').fillColor('#1e3a8a').text(
+            'STUDENT ENROLLMENT ROSTER',
+            leftX,
+            doc.y,
+            { width: pageWidth, align: 'center' }
+          );
+          doc.moveDown(0.4);
+          doc.strokeColor('#0f172a').lineWidth(1).moveTo(leftX, doc.y).lineTo(rightX, doc.y).stroke();
+          doc.moveDown(0.5);
+
+          const metaY = doc.y;
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#0f172a');
+          doc.text(`Academic Year: `, leftX, metaY, { continued: true }).font('Helvetica').text(summary.academicYear.yearName);
+          doc.font('Helvetica-Bold').text(`Class & Section: `, leftX + 190, metaY, { continued: true })
+            .font('Helvetica').text(`${summary.class.className} - ${summary.section.sectionName}`);
+          doc.font('Helvetica-Bold').text(`Active / Cap: `, leftX + 400, metaY, { continued: true })
+            .font('Helvetica').text(`${summary.capacity.activeEnrolled} / ${summary.capacity.maxCapacity}`);
+          doc.y = metaY + 18;
+        };
+
+        const cols = [
+          { label: '#', x: leftX, w: 26, align: 'center' },
+          { label: 'Roll', x: leftX + 26, w: 46, align: 'center' },
+          { label: 'Adm No', x: leftX + 72, w: 86, align: 'left' },
+          { label: 'Student Name', x: leftX + 158, w: 175, align: 'left' },
+          { label: 'Gender', x: leftX + 333, w: 58, align: 'center' },
+          { label: 'Enrolled On', x: leftX + 391, w: 72, align: 'center' },
+          { label: 'Status', x: leftX + 463, w: pageWidth - 463, align: 'center' }
+        ];
+
+        const drawTableHeader = (yPos) => {
+          doc.save();
+          doc.rect(leftX, yPos, pageWidth, 20).fill('#f1f5f9');
+          doc.strokeColor('#94a3b8').lineWidth(0.6).rect(leftX, yPos, pageWidth, 20).stroke();
+          doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#0f172a');
+          cols.forEach((c) => {
+            doc.text(c.label, c.x + 3, yPos + 6, { width: c.w - 6, align: c.align, lineBreak: false, ellipsis: true });
+          });
+          doc.restore();
+          return yPos + 20;
+        };
+
+        drawHeader();
+        let y = drawTableHeader(doc.y);
+        const rowH = 19;
+
+        enrollments.forEach((enr, idx) => {
+          if (y + rowH > bottomLimit) {
+            doc.addPage();
+            drawHeader();
+            y = drawTableHeader(doc.y);
+          }
+
+          if (idx % 2 === 1) {
+            doc.save();
+            doc.rect(leftX, y, pageWidth, rowH).fill('#f8fafc');
+            doc.restore();
+          }
+          doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(leftX, y, pageWidth, rowH).stroke();
+
+          const vals = [
+            String(idx + 1),
+            enr.rollNumber ? `#${enr.rollNumber}` : '—',
+            enr.admissionNumber || '—',
+            enr.fullName || '—',
+            enr.gender ? enr.gender.charAt(0) + enr.gender.slice(1).toLowerCase() : '—',
+            enr.enrollmentDate ? new Date(enr.enrollmentDate).toLocaleDateString('en-GB') : '—',
+            enr.status || '—'
+          ];
+
+          doc.font('Helvetica').fontSize(8.2).fillColor('#0f172a');
+          cols.forEach((c, ci) => {
+            doc.text(vals[ci], c.x + 3, y + 5.5, {
+              width: c.w - 6,
+              align: c.align,
+              lineBreak: false,
+              ellipsis: true
+            });
+          });
+
+          y += rowH;
         });
 
-        // Footer
-        doc.fontSize(8).fillColor('#64748b').text(`Generated on ${new Date().toLocaleString()} | Official DMMS Document`, 40, 790, { align: 'center', width: 515 });
+        // Optional Section Transfer Activity summary if transfers exist for this section
+        if (transfers.length > 0) {
+          y += 14;
+          if (y + 56 > bottomLimit) {
+            doc.addPage();
+            drawHeader();
+            y = doc.y;
+          }
+
+          doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e3a8a').text(
+            `Section Transfer Records (${transfers.length})`,
+            leftX,
+            y
+          );
+          y += 16;
+
+          const tCols = [
+            { label: 'Adm No', x: leftX, w: 80, align: 'left' },
+            { label: 'Student Name', x: leftX + 80, w: 135, align: 'left' },
+            { label: 'From', x: leftX + 215, w: 95, align: 'left' },
+            { label: 'To', x: leftX + 310, w: 95, align: 'left' },
+            { label: 'Date', x: leftX + 405, w: 62, align: 'center' },
+            { label: 'Dir', x: leftX + 467, w: pageWidth - 467, align: 'center' }
+          ];
+
+          const drawTransferHeader = (ty) => {
+            doc.save();
+            doc.rect(leftX, ty, pageWidth, 18).fill('#f1f5f9');
+            doc.strokeColor('#94a3b8').lineWidth(0.6).rect(leftX, ty, pageWidth, 18).stroke();
+            doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a');
+            tCols.forEach((c) => {
+              doc.text(c.label, c.x + 3, ty + 5, { width: c.w - 6, align: c.align, lineBreak: false, ellipsis: true });
+            });
+            doc.restore();
+            return ty + 18;
+          };
+
+          y = drawTransferHeader(y);
+          transfers.forEach((tr) => {
+            if (y + 18 > bottomLimit) {
+              doc.addPage();
+              drawHeader();
+              y = drawTransferHeader(doc.y);
+            }
+            doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(leftX, y, pageWidth, 18).stroke();
+            const tVals = [
+              tr.admissionNumber || '—',
+              tr.fullName || '—',
+              `${tr.fromClassName} - ${tr.fromSectionName}`,
+              `${tr.toClassName} - ${tr.toSectionName}`,
+              tr.changedAt ? new Date(tr.changedAt).toLocaleDateString('en-GB') : '—',
+              tr.direction || 'TRANSFER'
+            ];
+            doc.font('Helvetica').fontSize(7.8).fillColor('#0f172a');
+            tCols.forEach((c, ci) => {
+              doc.text(tVals[ci], c.x + 3, y + 5, {
+                width: c.w - 6,
+                align: c.align,
+                lineBreak: false,
+                ellipsis: true
+              });
+            });
+            y += 18;
+          });
+        }
+
+        // Page footers across all pages
+        const range = doc.bufferedPageRange();
+        for (let i = range.start; i < range.start + range.count; i++) {
+          doc.switchToPage(i);
+          doc.fontSize(7.5).font('Helvetica').fillColor('#64748b').text(
+            `Generated on ${new Date().toLocaleString()} | Official DMMS Document   •   Page ${i + 1} of ${range.count}`,
+            leftX,
+            doc.page.height - 32,
+            { width: pageWidth, align: 'center' }
+          );
+        }
+
+        doc.end();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  }
+
+  /**
+   * 7. Export Section Transfer Roster to PDF
+   */
+  static async exportSectionTransferRosterToPDF({ schoolId, academicYearRef, classRef, sectionRef }) {
+    const sId = schoolId.toUpperCase();
+    const [transferData, school] = await Promise.all([
+      StudentService.listSectionTransfers({ schoolId: sId, academicYearRef, classRef, sectionRef }),
+      SchoolInfo.findOne({ schoolId: sId }).lean()
+    ]);
+
+    const transfers = transferData?.transfers || [];
+    if (transfers.length === 0) {
+      const err = new Error('No section transfer records found for the selected filters.');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    const ayLabel = transferData.academicYear?.yearName || transferData.academicYear?.yearCode || 'All Years';
+    const classLabel = transferData.class?.className || 'All Classes';
+    const sectionLabel = transferData.section?.sectionName || 'All Sections';
+
+    return new Promise((resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ margin: 36, size: 'A4', bufferPages: true });
+        const buffers = [];
+
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+
+        const pageWidth = doc.page.width - 72;
+        const leftX = 36;
+        const rightX = leftX + pageWidth;
+        const bottomLimit = doc.page.height - 54;
+
+        const drawHeader = () => {
+          doc.rect(0, 0, doc.page.width, doc.page.height).fill('#ffffff');
+          doc.fillColor('#0f172a').fontSize(15).font('Helvetica-Bold').text(
+            (school?.schoolName || 'DIGITAL MARKSHEET MANAGEMENT SYSTEM').toUpperCase(),
+            leftX,
+            30,
+            { width: pageWidth, align: 'center' }
+          );
+          if (school?.address) {
+            doc.fontSize(8.5).font('Helvetica').fillColor('#475569').text(school.address, leftX, doc.y + 2, {
+              width: pageWidth,
+              align: 'center'
+            });
+          }
+          doc.moveDown(0.35);
+          doc.fontSize(11.5).font('Helvetica-Bold').fillColor('#1e3a8a').text(
+            'SECTION TRANSFER ROSTER',
+            leftX,
+            doc.y,
+            { width: pageWidth, align: 'center' }
+          );
+          doc.moveDown(0.4);
+          doc.strokeColor('#0f172a').lineWidth(1).moveTo(leftX, doc.y).lineTo(rightX, doc.y).stroke();
+          doc.moveDown(0.5);
+
+          const metaY = doc.y;
+          doc.fontSize(9).font('Helvetica-Bold').fillColor('#0f172a');
+          doc.text('Academic Year: ', leftX, metaY, { continued: true }).font('Helvetica').text(ayLabel);
+          doc.font('Helvetica-Bold').text('Class: ', leftX + 180, metaY, { continued: true }).font('Helvetica').text(classLabel);
+          doc.font('Helvetica-Bold').text('Section: ', leftX + 310, metaY, { continued: true }).font('Helvetica').text(sectionLabel);
+          doc.font('Helvetica-Bold').text('Records: ', leftX + 440, metaY, { continued: true }).font('Helvetica').text(String(transfers.length));
+          doc.y = metaY + 18;
+        };
+
+        const cols = [
+          { label: '#', x: leftX, w: 22, align: 'center' },
+          { label: 'Adm No', x: leftX + 22, w: 72, align: 'left' },
+          { label: 'Student Name', x: leftX + 94, w: 112, align: 'left' },
+          { label: 'From', x: leftX + 206, w: 86, align: 'left' },
+          { label: 'To', x: leftX + 292, w: 86, align: 'left' },
+          { label: 'Date', x: leftX + 378, w: 58, align: 'center' },
+          { label: 'Remarks', x: leftX + 436, w: pageWidth - 436, align: 'left' }
+        ];
+
+        const drawTableHeader = (yPos) => {
+          doc.save();
+          doc.rect(leftX, yPos, pageWidth, 20).fill('#f1f5f9');
+          doc.strokeColor('#94a3b8').lineWidth(0.6).rect(leftX, yPos, pageWidth, 20).stroke();
+          doc.font('Helvetica-Bold').fontSize(8.2).fillColor('#0f172a');
+          cols.forEach((c) => {
+            doc.text(c.label, c.x + 3, yPos + 6, { width: c.w - 6, align: c.align, lineBreak: false, ellipsis: true });
+          });
+          doc.restore();
+          return yPos + 20;
+        };
+
+        drawHeader();
+        let y = drawTableHeader(doc.y);
+
+        transfers.forEach((tr, idx) => {
+          const remarksText = tr.remarks || '—';
+          doc.font('Helvetica').fontSize(7.8);
+          const remarksH = doc.heightOfString(remarksText, { width: cols[6].w - 6 });
+          const rowH = Math.max(20, Math.ceil(remarksH) + 8);
+
+          if (y + rowH > bottomLimit) {
+            doc.addPage();
+            drawHeader();
+            y = drawTableHeader(doc.y);
+          }
+
+          if (idx % 2 === 1) {
+            doc.save();
+            doc.rect(leftX, y, pageWidth, rowH).fill('#f8fafc');
+            doc.restore();
+          }
+          doc.strokeColor('#cbd5e1').lineWidth(0.5).rect(leftX, y, pageWidth, rowH).stroke();
+
+          const vals = [
+            String(idx + 1),
+            tr.admissionNumber || '—',
+            tr.fullName || '—',
+            `${tr.fromClassName} - ${tr.fromSectionName}`,
+            `${tr.toClassName} - ${tr.toSectionName}`,
+            tr.changedAt ? new Date(tr.changedAt).toLocaleDateString('en-GB') : '—',
+            remarksText
+          ];
+
+          doc.font('Helvetica').fontSize(7.8).fillColor('#0f172a');
+          cols.forEach((c, ci) => {
+            if (ci === 6) {
+              doc.text(vals[ci], c.x + 3, y + 4.5, { width: c.w - 6, align: c.align });
+            } else {
+              doc.text(vals[ci], c.x + 3, y + 5.5, {
+                width: c.w - 6,
+                align: c.align,
+                lineBreak: false,
+                ellipsis: true
+              });
+            }
+          });
+
+          y += rowH;
+        });
+
+        const range = doc.bufferedPageRange();
+        for (let i = range.start; i < range.start + range.count; i++) {
+          doc.switchToPage(i);
+          doc.fontSize(7.5).font('Helvetica').fillColor('#64748b').text(
+            `Generated on ${new Date().toLocaleString()} | Official DMMS Document   •   Page ${i + 1} of ${range.count}`,
+            leftX,
+            doc.page.height - 32,
+            { width: pageWidth, align: 'center' }
+          );
+        }
 
         doc.end();
       } catch (err) {

@@ -23,7 +23,7 @@ import {
 
 const StudentImportPage = () => {
   const navigate = useNavigate();
-  const { academicYears, selectedAcademicYear } = useAcademicYear();
+  const { academicYears, selectedYear } = useAcademicYear();
 
   const [importType, setImportType] = useState('NEW_ADMISSION');
   const [academicYearId, setAcademicYearId] = useState('');
@@ -42,27 +42,30 @@ const StudentImportPage = () => {
   const [alert, setAlert] = useState({ type: '', message: '' });
 
   useEffect(() => {
-    if (selectedAcademicYear?._id && !academicYearId) {
-      setAcademicYearId(selectedAcademicYear._id);
+    if (selectedYear?._id && !academicYearId) {
+      setAcademicYearId(selectedYear._id);
     } else if (academicYears.length > 0 && !academicYearId) {
       const current = academicYears.find((y) => y.isCurrent) || academicYears[0];
       setAcademicYearId(current._id);
     }
-  }, [selectedAcademicYear, academicYears]);
+  }, [selectedYear, academicYears]);
 
   // Download Template
   const handleDownloadTemplate = async () => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:8000/api/admin/students/import/template?importType=${importType}`,
+        `/api/admin/students/import/template?importType=${importType}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'x-school-token': localStorage.getItem('schoolToken') || ''
+            Authorization: `Bearer ${localStorage.getItem('dmms_user_token') || ''}`,
+            'x-school-token': localStorage.getItem('dmms_school_token') || ''
           }
         }
       );
-      if (!response.ok) throw new Error('Failed to download template.');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.message || 'Failed to download template.');
+      }
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -72,6 +75,7 @@ const StudentImportPage = () => {
       document.body.appendChild(a);
       a.click();
       a.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       setAlert({ type: 'error', message: err.message || 'Failed to download template.' });
     }

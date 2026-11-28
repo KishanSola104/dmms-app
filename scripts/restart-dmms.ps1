@@ -10,6 +10,28 @@ if (-not (Test-Path $LogDir)) {
   New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
 }
 
+# Brief wait so the HTTP 202 response finishes sending before stopping the current backend
+Start-Sleep -Milliseconds 650
+
+$SupervisorPidFile = Join-Path $LogDir 'supervisor.pid'
+$SupervisorAlive = $false
+
+if (Test-Path $SupervisorPidFile) {
+  try {
+    $SupPid = [int](Get-Content $SupervisorPidFile -Raw).Trim()
+    if ($SupPid -gt 0 -and (Get-Process -Id $SupPid -ErrorAction SilentlyContinue)) {
+      $SupervisorAlive = $true
+    }
+  } catch {}
+}
+
+if ($SupervisorAlive) {
+  # Trigger supervisor-managed controlled restart of both backend and frontend
+  $RestartReqFile = Join-Path $LogDir 'restart.request'
+  Set-Content -Path $RestartReqFile -Value (Get-Date -Format 'o') -Encoding ASCII
+  exit 0
+}
+
 function Stop-ProcessOnPort([int]$Port) {
   try {
     $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
@@ -27,28 +49,33 @@ function Stop-ProcessOnPort([int]$Port) {
   } catch {}
 }
 
-# Brief wait so the HTTP response finishes sending before stopping the current backend
-Start-Sleep -Milliseconds 600
-
 Stop-ProcessOnPort -Port $BackendPort
 Stop-ProcessOnPort -Port $FrontendPort
 Start-Sleep -Milliseconds 800
 
-$BackendDir = Join-Path $RootDir 'backend'
-$FrontendDir = Join-Path $RootDir 'frontend'
+$DistIndex = Join-Path $RootDir 'frontend\dist\index.html'
+$SupervisorScript = Join-Path $RootDir 'scripts\dmms-supervisor.js'
 
-# Start Backend using its existing package.json script (preserves .env and DB)
-Start-Process -FilePath 'cmd.exe' `
-  -ArgumentList '/c', 'npm run dev' `
-  -WorkingDirectory $BackendDir `
-  -WindowStyle Hidden `
-  -RedirectStandardOutput (Join-Path $LogDir 'backend-restart.log') `
-  -RedirectStandardError (Join-Path $LogDir 'backend-restart-err.log') | Out-Null
+if ((Test-Path $DistIndex) -and (Test-Path $SupervisorScript)) {
+  Start-Process -FilePath 'node.exe' `
+    -ArgumentList "`"$SupervisorScript`"" `
+    -WorkingDirectory $RootDir `
+    -WindowStyle Hidden | Out-Null
+} else {
+  $BackendDir = Join-Path $RootDir 'backend'
+  $FrontendDir = Join-Path $RootDir 'frontend'
 
-# Start Frontend using its existing Vite dev script
-Start-Process -FilePath 'cmd.exe' `
-  -ArgumentList '/c', 'npm run dev' `
-  -WorkingDirectory $FrontendDir `
-  -WindowStyle Hidden `
-  -RedirectStandardOutput (Join-Path $LogDir 'frontend-restart.log') `
-  -RedirectStandardError (Join-Path $LogDir 'frontend-restart-err.log') | Out-Null
+  Start-Process -FilePath 'cmd.exe' `
+    -ArgumentList '/c', 'npm run dev' `
+    -WorkingDirectory $BackendDir `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $LogDir 'backend-restart.log') `
+    -RedirectStandardError (Join-Path $LogDir 'backend-restart-err.log') | Out-Null
+
+  Start-Process -FilePath 'cmd.exe' `
+    -ArgumentList '/c', 'npm run dev' `
+    -WorkingDirectory $FrontendDir `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $LogDir 'frontend-restart.log') `
+    -RedirectStandardError (Join-Path $LogDir 'frontend-restart-err.log') | Out-Null
+}

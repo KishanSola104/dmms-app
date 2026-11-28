@@ -158,7 +158,7 @@ class TeacherService {
     ).map(id => new mongoose.Types.ObjectId(id));
 
     const examIds = examsInYear.map(e => e._id);
-    const [examClassDocs, examSubjectDocs, submissions, extraAllocations] = await Promise.all([
+    const [examClassDocs, examSubjectDocs, submissions, activeClassAllocations] = await Promise.all([
       assignedClassIds.length > 0 && examIds.length > 0
         ? ExaminationClassInfo.find({
             schoolId,
@@ -184,11 +184,15 @@ class TeacherService {
             schoolId,
             academicYearRef: ayId,
             classRef: { $in: assignedClassIds },
-            hasAdditionalComponents: true,
             status: 'ACTIVE'
           }).lean()
         : Promise.resolve([])
     ]);
+
+    const activeClassSubjSet = new Set(
+      activeClassAllocations.map(a => `${a.classRef.toString()}_${a.subjectRef.toString()}`)
+    );
+    const extraAllocations = activeClassAllocations.filter(a => a.hasAdditionalComponents);
 
     const submissionMap = new Map();
     for (const sub of submissions) {
@@ -323,6 +327,10 @@ class TeacherService {
     };
 
     for (const assign of subjectAssignments) {
+      // Skip deallocated subjects so teachers don't see pending marks-entry tasks for deallocated subjects
+      if (!activeClassSubjSet.has(`${assign.classRef.toString()}_${assign.subjectRef.toString()}`)) {
+        continue;
+      }
       for (const ex of examsInYear) {
         const es = examSubjectMap.get(`${ex._id.toString()}_${assign.classRef.toString()}_${assign.subjectRef.toString()}`);
         if (!es) continue;

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { useSchoolAuth } from '../context/SchoolAuthContext';
 import { useUserAuth } from '../context/UserAuthContext';
+import { useBackendHealth } from '../context/BackendHealthContext';
 import api from '../services/api';
 import {
   Building2,
@@ -23,6 +24,7 @@ const UserLoginPage = () => {
   const navigate = useNavigate();
   const { currentSchool, logoutSchool } = useSchoolAuth();
   const { loginUser, logoutUser } = useUserAuth();
+  const { refreshApp } = useBackendHealth();
 
   const [roles, setRoles] = useState([]);
   const [selectedRole, setSelectedRole] = useState('');
@@ -41,27 +43,35 @@ const UserLoginPage = () => {
   const [forgotError, setForgotError] = useState('');
 
   // Fetch roles dynamically from role_info table
-  useEffect(() => {
-    const fetchRoles = async () => {
-      try {
-        const res = await api.get('/auth/roles');
-        if (res.success && res.roles) {
-          setRoles(res.roles);
-          if (res.roles.length > 0) {
-            setSelectedRole(res.roles[0].roleCode);
-            setForgotRole(res.roles[0].roleCode);
-          }
+  const fetchRoles = useCallback(async () => {
+    setRolesLoading(true);
+    try {
+      const res = await api.get('/auth/roles');
+      if (res.success && res.roles) {
+        setRoles(res.roles);
+        if (res.roles.length > 0) {
+          setSelectedRole((prev) => prev || res.roles[0].roleCode);
+          setForgotRole((prev) => prev || res.roles[0].roleCode);
         }
-      } catch (err) {
-        console.error('[UserLogin] Error loading roles:', err.message);
-        setErrorMessage('Failed to load system roles. Please check network connection.');
-      } finally {
-        setRolesLoading(false);
+        setErrorMessage('');
       }
-    };
-
-    fetchRoles();
+    } catch (err) {
+      console.error('[UserLogin] Error loading roles:', err.message);
+      setErrorMessage(err.message || 'DMMS is temporarily unavailable. Please wait while the system reconnects.');
+    } finally {
+      setRolesLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchRoles();
+
+    const handleReconnected = () => {
+      fetchRoles();
+    };
+    window.addEventListener('dmms:backend-reconnected', handleReconnected);
+    return () => window.removeEventListener('dmms:backend-reconnected', handleReconnected);
+  }, [fetchRoles]);
 
   const handleUserLogin = async (e) => {
     e.preventDefault();
@@ -296,15 +306,31 @@ const UserLoginPage = () => {
               </div>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Need school login?</span>
-              <button
-                type="button"
-                onClick={handleChangeSchool}
-                className="text-blue-600 hover:text-blue-800 font-semibold"
-              >
-                Return to School Login
-              </button>
+            <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Need school login?</span>
+                <button
+                  type="button"
+                  onClick={handleChangeSchool}
+                  className="text-blue-600 hover:text-blue-800 font-semibold"
+                >
+                  Return to School Login
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-3 text-xs pt-1">
+                <button
+                  type="button"
+                  onClick={() => refreshApp({ reloadPage: true })}
+                  className="inline-flex items-center space-x-1 text-slate-600 hover:text-blue-600 font-semibold cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Refresh App</span>
+                </button>
+                <span className="text-slate-300">|</span>
+                <Link to="/refresh-app" className="text-blue-600 hover:text-blue-800 font-semibold">
+                  Recovery &amp; Status
+                </Link>
+              </div>
             </div>
 
           </div>
@@ -372,28 +398,38 @@ const UserLoginPage = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-end space-x-2 pt-2">
+                <div className="flex items-center justify-between pt-2">
                   <button
                     type="button"
-                    onClick={() => setShowForgotModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                    onClick={() => refreshApp({ reloadPage: true })}
+                    className="inline-flex items-center space-x-1 text-xs font-semibold text-slate-600 hover:text-indigo-600 cursor-pointer"
                   >
-                    Cancel
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Refresh App</span>
                   </button>
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs flex items-center space-x-1.5"
-                  >
-                    {forgotLoading ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <span>Request Password</span>
-                    )}
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(false)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-xs flex items-center space-x-1.5"
+                    >
+                      {forgotLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <span>Request Password</span>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </form>
             ) : (

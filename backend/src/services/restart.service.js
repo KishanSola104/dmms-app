@@ -33,6 +33,13 @@ class RestartService {
       throw err;
     }
 
+    const allowedRoles = ['ADMIN', 'HEAD_TEACHER', 'TEACHER', 'OFFICE_STAFF'];
+    if (!allowedRoles.includes((user.roleCode || '').toUpperCase())) {
+      const err = new Error('You are not authorized to restart the application.');
+      err.statusCode = 403;
+      throw err;
+    }
+
     const now = Date.now();
 
     if (restartInProgress) {
@@ -94,7 +101,7 @@ class RestartService {
       user
     });
 
-    if (process.env.NODE_ENV === 'production' && process.env.PM2_HOME) {
+    if (process.env.PM2_HOME) {
       // Production PM2 controlled restart if applicable
       try {
         const child = spawn('pm2', ['reload', 'all'], { detached: true, stdio: 'ignore', shell: false });
@@ -106,6 +113,7 @@ class RestartService {
     } else if (process.platform === 'win32') {
       try {
         const backendPort = String(process.env.PORT || 8000);
+        const frontendPort = String(process.env.FRONTEND_PORT || 5173);
         const child = spawn(
           'powershell.exe',
           [
@@ -118,7 +126,7 @@ class RestartService {
             '-BackendPort',
             backendPort,
             '-FrontendPort',
-            '5173',
+            frontendPort,
             '-RootDir',
             rootDir
           ],

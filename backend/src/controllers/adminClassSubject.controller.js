@@ -116,7 +116,7 @@ class AdminClassSubjectController {
   }
 
   /**
-   * Toggle allocation status
+   * Toggle allocation status (ACTIVE / INACTIVE)
    */
   static async toggleAllocationStatus(req, res, next) {
     try {
@@ -127,9 +127,65 @@ class AdminClassSubjectController {
         allocationId,
         status
       });
+
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef: result.academicYearRef,
+        classRef: result.classRef,
+        subjectRef: result.subjectRef,
+        module: 'ACADEMIC',
+        entityType: 'ClassSubjectInfo',
+        entityId: result._id.toString(),
+        action: result.status === 'INACTIVE' ? 'CLASS_SUBJECT_DEALLOCATED' : 'CLASS_SUBJECT_REACTIVATED',
+        details: `${result.status === 'INACTIVE' ? 'Deallocated' : 'Reactivated'} subject ${result.subjectName} (${result.subjectCode}) for class`,
+        newValue: { status: result.status },
+        user: req.user
+      });
+
       return res.json({
         success: true,
-        message: `Subject allocation status changed to ${result.status}.`,
+        message:
+          result.status === 'INACTIVE'
+            ? `Subject '${result.subjectName}' deallocated from this class for the selected academic year. Historical marks and results are preserved.`
+            : `Subject '${result.subjectName}' re-allocated to this class.`,
+        allocation: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Explicitly deallocate a subject from a class for the selected academic year
+   */
+  static async deallocateAllocation(req, res, next) {
+    try {
+      const { allocationId } = req.params;
+      const result = await ClassSubjectService.deallocateAllocation({
+        schoolId: req.user.schoolId,
+        allocationId
+      });
+
+      await AuditLogService.log({
+        schoolRef: req.user.schoolRef,
+        schoolId: req.user.schoolId,
+        academicYearRef: result.academicYearRef,
+        classRef: result.classRef,
+        subjectRef: result.subjectRef,
+        module: 'ACADEMIC',
+        entityType: 'ClassSubjectInfo',
+        entityId: result._id.toString(),
+        action: 'CLASS_SUBJECT_DEALLOCATED',
+        details: `Deallocated subject ${result.subjectName} (${result.subjectCode}) from class while preserving historical records`,
+        previousValue: { status: 'ACTIVE' },
+        newValue: { status: 'INACTIVE' },
+        user: req.user
+      });
+
+      return res.json({
+        success: true,
+        message: `Subject '${result.subjectName}' deallocated from this class for the selected academic year. Historical marks and results are preserved.`,
         allocation: result
       });
     } catch (error) {

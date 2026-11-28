@@ -343,6 +343,7 @@ class ClassSubjectService {
 
   /**
    * Toggle Allocation status (ACTIVE / INACTIVE)
+   * Preserves historical marks, results, previous academic years, and unrelated teacher assignments.
    */
   static async toggleAllocationStatus({ schoolId, allocationId, status }) {
     const allocation = await ClassSubjectInfo.findOne({
@@ -354,26 +355,40 @@ class ClassSubjectService {
       throw new Error('Subject allocation record not found.');
     }
 
-    const cleanStatus = status.toUpperCase();
+    const cleanStatus = String(status || '').toUpperCase();
     if (!['ACTIVE', 'INACTIVE'].includes(cleanStatus)) {
       throw new Error("Status must be either 'ACTIVE' or 'INACTIVE'.");
     }
 
-    // Dependency check: If deactivating, ensure no active teacher assignment exists
-    if (cleanStatus === 'INACTIVE') {
-      const SubjectTeacherAssignmentInfo = mongoose.models.SubjectTeacherAssignmentInfo;
-      if (SubjectTeacherAssignmentInfo) {
-        const activeAssignment = await SubjectTeacherAssignmentInfo.findOne({
-          classSubjectRef: allocation._id,
-          status: 'ACTIVE'
-        });
-        if (activeAssignment) {
-          throw new Error('Cannot deactivate subject allocation because an active teacher assignment is linked to it. Deactivate the teacher assignment first.');
-        }
-      }
+    allocation.status = cleanStatus;
+    await allocation.save();
+
+    return allocation;
+  }
+
+  /**
+   * Explicitly deallocate an allocated subject from a class for a specific academic year.
+   * Academic-year aware; preserves historical marks, results, and school subject pool.
+   */
+  static async deallocateAllocation({ schoolId, allocationId }) {
+    const allocation = await ClassSubjectInfo.findOne({
+      _id: allocationId,
+      schoolId
+    });
+
+    if (!allocation) {
+      const err = new Error('Subject allocation record not found.');
+      err.statusCode = 404;
+      throw err;
     }
 
-    allocation.status = cleanStatus;
+    if (allocation.status === 'INACTIVE') {
+      const err = new Error(`Subject '${allocation.subjectName}' is already deallocated from this class for the selected academic year.`);
+      err.statusCode = 400;
+      throw err;
+    }
+
+    allocation.status = 'INACTIVE';
     await allocation.save();
 
     return allocation;
