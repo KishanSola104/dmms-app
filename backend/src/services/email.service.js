@@ -7,23 +7,68 @@ class EmailService {
   /**
    * Send Email with HTML template
    */
-  static async sendMail({ to, subject, html }) {
+  
+static async sendMail({ to, subject, html }) {
     try {
-      const transporter = createTransporter();
-      const sender = (process.env.SMTP_EMAIL || 'shreejiitsolution120@gmail.com').trim();
-      const info = await transporter.sendMail({
-        from: `"DMMS Portal" <${sender}>`,
-        to,
-        subject,
-        html
-      });
-      console.log(`[EmailService] Email sent successfully to: ${to} (MessageID: ${info.messageId})`);
-      return { success: true, messageId: info.messageId };
+        const transporter = createTransporter();
+
+        const sender = process.env.SMTP_EMAIL;
+
+        if (!sender) {
+            throw new Error("SMTP_EMAIL is not configured.");
+        }
+
+        const info = await transporter.sendMail({
+            from: `"DMMS Portal" <${sender}>`,
+            to,
+            subject,
+            html
+        });
+
+        console.log(
+            `[EmailService] Email sent successfully to: ${to} (MessageID: ${info.messageId})`
+        );
+
+        return {
+            success: true,
+            messageId: info.messageId
+        };
+
     } catch (error) {
-      console.error(`[EmailService] Failed to send email to ${to}: ${error.message}`);
-      return { success: false, error: error.message };
+
+        const errorDetails = `${error.message || ""} ${error.response || ""}`;
+
+        // Gmail daily sending limit
+        const quotaExceeded =
+            Number(error.responseCode) === 550 &&
+              /5\.4\.5|Daily user sending limit exceeded/i.test(errorDetails);
+
+        if (quotaExceeded) {
+            console.error(
+                `[EmailService] Gmail daily sending limit exceeded. Email to ${to} was not sent.`
+            );
+
+            return {
+                success: false,
+                code: "EMAIL_DAILY_LIMIT_EXCEEDED",
+                retryable: false,
+                message: "Daily email sending limit exceeded. Try again after the quota resets."
+            };
+        }
+
+        console.error(
+            `[EmailService] Failed to send email to ${to}: ${error.message}`
+        );
+
+        return {
+            success: false,
+            code: "EMAIL_SEND_FAILED",
+            retryable: false,
+            message: "Unable to send email."
+        };
     }
-  }
+}
+
 
   /**
    * Send School Credentials Email

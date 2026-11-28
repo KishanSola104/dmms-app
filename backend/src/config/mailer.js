@@ -1,34 +1,54 @@
+
 const nodemailer = require('nodemailer');
 
+let transporter = null;
+
 const createTransporter = () => {
-  const user = (process.env.SMTP_EMAIL || 'shreejiitsolution120@gmail.com').trim();
-  const pass = (process.env.SMTP_PASSWORD || 'idzetsgooccvapsn').trim();
-
-  // If host is smtp.gmail.com or user ends with @gmail.com, use service: 'gmail' for best reliability
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  if (host.includes('gmail') || user.endsWith('@gmail.com')) {
-    return nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: user,
-        pass: pass
-      }
-    });
-  }
-
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
-  return nodemailer.createTransport({
-    host: host,
-    port: port,
-    secure: port === 465,
-    auth: {
-      user: user,
-      pass: pass
-    },
-    tls: {
-      rejectUnauthorized: false
+    // Reuse existing transporter
+    if (transporter) {
+        return transporter;
     }
-  });
+
+    const user = process.env.SMTP_EMAIL?.trim();
+    const pass = process.env.SMTP_PASSWORD?.replace(/\s/g, '');
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+
+    if (!user || !pass) {
+        throw new Error(
+            'SMTP_EMAIL or SMTP_PASSWORD is missing in environment variables.'
+        );
+    }
+
+    // Gmail SMTP configuration
+    if (
+        host.includes('gmail.com') ||
+        user.endsWith('@gmail.com')
+    ) {
+        transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user,
+                pass
+            }
+        });
+
+        return transporter;
+    }
+
+    // Other SMTP providers
+    const port = Number(process.env.SMTP_PORT || 587);
+
+    transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: {
+            user,
+            pass
+        }
+    });
+
+    return transporter;
 };
 
 module.exports = { createTransporter };

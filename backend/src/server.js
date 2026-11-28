@@ -27,7 +27,21 @@ connectDB().then(async () => {
   // Seed predefined roles
   await seedRoles();
 });
+const { createTransporter } = require('./config/mailer');
 
+const testEmailConnection = async () => {
+    try {
+        const transporter = createTransporter();
+
+        await transporter.verify();
+
+        console.log('Gmail SMTP connection successful!');
+    } catch (error) {
+        console.error('Gmail SMTP connection failed:', error.message);
+    }
+};
+
+testEmailConnection();
 // Middleware
 app.use(cors({
   origin: '*',
