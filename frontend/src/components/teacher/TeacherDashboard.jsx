@@ -118,10 +118,10 @@ const TeacherDashboard = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      {/* Header Banner */}
-      <div className="bg-linear-to-r from-emerald-700 via-teal-700 to-slate-900 rounded-2xl text-white p-6 sm:p-7 shadow-lg flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 rounded-full text-xs font-medium text-emerald-100 mb-2 border border-white/10">
+            {/* Header Banner */}
+      <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-slate-900 rounded-2xl text-white p-6 sm:p-8 shadow-lg relative overflow-hidden flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="relative z-10">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 backdrop-blur-xs rounded-full text-xs font-medium text-purple-200 mb-3 border border-white/10">
             <span>
               {currentUser?.roleCode === 'HEAD_TEACHER'
                 ? 'Head Teacher • Teaching Responsibilities'
@@ -131,29 +131,30 @@ const TeacherDashboard = () => {
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
             Welcome, {currentUser?.fullName || currentUser?.userId}
           </h1>
-          <p className="text-xs sm:text-sm text-emerald-100/90 mt-1">
-            {currentSchool?.schoolName} ({currentSchool?.schoolId}) &bull; Session:{' '}
+          <p className="text-sm sm:text-base text-slate-200 mt-1 opacity-90">
+            <span className="font-semibold">{currentSchool?.schoolName}</span> ({currentSchool?.schoolId}) &bull; Session:{' '}
             <strong>{selectedYear?.yearName || selectedYear?.yearCode || 'N/A'}</strong>
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative z-10 flex flex-wrap items-center gap-2">
           {isClassTeacher && (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/15 border border-white/20 text-xs font-semibold">
-              <ShieldCheck className="w-4 h-4 mr-1.5 text-amber-300" />
+            <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-black/25 border border-white/10 text-xs font-semibold text-purple-100">
+              <ShieldCheck className="w-4 h-4 mr-1.5 text-purple-300" />
               Class Teacher Assigned ({data?.classTeacherSections?.length})
             </span>
           )}
           <button
             type="button"
             onClick={fetchDashboard}
-            className="inline-flex items-center px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold transition-colors"
+            className="inline-flex items-center px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-semibold text-white transition-colors"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-purple-200 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
       </div>
+
 
       {error && (
         <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start space-x-3 text-rose-800 text-sm">

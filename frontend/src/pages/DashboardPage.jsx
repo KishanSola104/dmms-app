@@ -122,34 +122,36 @@ const DashboardPage = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-in fade-in duration-200">
-        
-        {/* Welcome Banner */}
-        <div className="bg-linear-to-r from-blue-700 via-indigo-700 to-slate-900 rounded-2xl text-white p-6 sm:p-8 shadow-lg relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 backdrop-blur-xs rounded-full text-xs font-medium text-blue-200 mb-3 border border-white/10">
-              <span>{statsData?.roleTitle || `${currentUser?.roleName} Dashboard`}</span>
-            </div>
-            
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Welcome back, {currentUser?.fullName || currentUser?.userId}!
-            </h1>
-            
-            <p className="text-sm sm:text-base text-slate-200 mt-1 max-w-2xl opacity-90">
-              Digital Marksheet Management System &bull; {currentSchool?.schoolName} ({currentSchool?.schoolId})
-            </p>
+  
+  {/* Welcome Banner */}
+  <div className="bg-gradient-to-r from-purple-800 via-indigo-800 to-slate-900 rounded-2xl text-white p-6 sm:p-8 shadow-lg relative overflow-hidden">
+    <div className="relative z-10">
+      <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 backdrop-blur-xs rounded-full text-xs font-medium text-purple-200 mb-3 border border-white/10">
+        <span>{statsData?.roleTitle || `${currentUser?.roleName} Dashboard`}</span>
+      </div>
+      
+      <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+        Welcome back, {currentUser?.fullName || currentUser?.userId}!
+      </h1>
+      
+      <p className="text-sm sm:text-base text-slate-200 mt-1 max-w-2xl opacity-90">
+        Digital Marksheet Management System &bull;{' '}
+        <span className="font-semibold">{currentSchool?.schoolName}</span> ({currentSchool?.schoolId})
+      </p>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-blue-100">
-              <div className="flex items-center space-x-1.5 bg-black/20 px-3 py-1 rounded-lg">
-                <Calendar className="w-3.5 h-3.5 text-blue-300" />
-                <span>Active Year: <strong>{selectedYear?.yearCode || 'N/A'}</strong></span>
-              </div>
-              <div className="flex items-center space-x-1.5 bg-black/20 px-3 py-1 rounded-lg">
-                <Shield className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Role: <strong>{currentUser?.roleName}</strong></span>
-              </div>
-            </div>
-          </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-purple-100">
+        <div className="flex items-center space-x-1.5 bg-black/25 px-3 py-1.5 rounded-lg border border-white/10">
+          <Calendar className="w-3.5 h-3.5 text-purple-300" />
+          <span>Active Year: <strong>{selectedYear?.yearCode || 'N/A'}</strong></span>
         </div>
+        <div className="flex items-center space-x-1.5 bg-black/25 px-3 py-1.5 rounded-lg border border-white/10">
+          <Shield className="w-3.5 h-3.5 text-blue-300" />
+          <span>Role: <strong>{currentUser?.roleName}</strong></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
         {/* Dynamic Metric Cards */}
         {loading ? (
